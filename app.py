@@ -514,6 +514,22 @@ def delete_ticket(ticket_id):
 def api_refresh():
     return jsonify({'status': 'success', 'message': 'Data refreshed from Excel'})
 
+@app.route('/api/download-excel')
+def download_excel():
+    """Download the current Excel file."""
+    try:
+        from flask import send_file
+        if os.path.exists(EXCEL_FILE):
+            return send_file(
+                EXCEL_FILE,
+                as_attachment=True,
+                download_name='tickets_export.xlsx',
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        return jsonify({'error': 'Excel file not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Startup diagnostics for authentication
 def print_auth_diagnostics():
     """Print authentication setup diagnostics."""
