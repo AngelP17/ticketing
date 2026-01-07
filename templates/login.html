@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - IT Operations Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+        }
+
+        .input-field {
+            transition: all 0.3s;
+        }
+
+        .input-field:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl p-8 w-full max-w-md">
+        <!-- Logo -->
+        <div class="flex items-center justify-center gap-3 mb-8">
+            <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
+                <i class="fas fa-server text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-white">IT Ops<span class="text-blue-400">Center</span></h1>
+                <p class="text-xs text-slate-500">Enterprise Dashboard</p>
+            </div>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="space-y-5">
+            <div>
+                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Username</label>
+                <input type="text" id="username"
+                    class="input-field w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="Enter username" required>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 uppercase tracking-wider mb-2">Password</label>
+                <input type="password" id="password"
+                    class="input-field w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="Enter password" required>
+            </div>
+
+            <!-- Error Message -->
+            <div id="error-msg"
+                class="hidden bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg text-sm"></div>
+
+            <button type="submit"
+                class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-2">
+                <i class="fas fa-sign-in-alt"></i>
+                Sign In
+            </button>
+        </form>
+
+        <p class="text-center text-slate-500 text-xs mt-6">
+            Secure access to IT ticket management
+        </p>
+    </div>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById('error-msg');
+            errorEl.classList.add('hidden');
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    window.location.href = '/';
+                } else {
+                    errorEl.textContent = data.error || 'Login failed';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errorEl.textContent = 'Network error';
+                errorEl.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

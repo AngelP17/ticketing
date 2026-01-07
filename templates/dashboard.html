@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Operations Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+        }
+
+        .sidebar {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+        }
+
+        .card:hover {
+            border-color: rgba(96, 165, 250, 0.5);
+        }
+
+        .nav-item {
+            transition: all 0.2s;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, transparent 100%);
+            border-left: 3px solid #3b82f6;
+        }
+
+        .nav-item:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .kpi-glow {
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.15);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        .status-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .modal-window {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .ticket-row {
+            cursor: pointer;
+        }
+
+        .ticket-row:hover {
+            background: rgba(59, 130, 246, 0.1) !important;
+        }
+    </style>
+</head>
+
+<body class="text-gray-300">
+    <!-- Sidebar -->
+    <div class="sidebar fixed inset-y-0 left-0 w-64 flex flex-col z-20">
+        <div class="p-6 border-b border-slate-700/50">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
+                    <i class="fas fa-server text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white">IT Ops<span class="text-blue-400">Center</span></h1>
+                    <p class="text-xs text-slate-500">Enterprise Dashboard</p>
+                </div>
+            </div>
+        </div>
+        <nav class="flex-1 p-4 space-y-1">
+            <button onclick="switchView('dashboard')" id="nav-dashboard"
+                class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-chart-pie w-5 text-blue-400"></i> <span class="text-white font-medium">Dashboard</span>
+            </button>
+            <button onclick="switchView('tickets')" id="nav-tickets"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-ticket-alt w-5 text-slate-400"></i> <span>All Tickets</span>
+            </button>
+            <button onclick="switchView('legend')" id="nav-legend"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-info-circle w-5 text-slate-400"></i> <span>Color Legend</span>
+            </button>
+            <button onclick="switchView('team')" id="nav-team"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-users w-5 text-slate-400"></i> <span>Team Workload</span>
+            </button>
+            <button onclick="switchView('users')" id="nav-users"
+                class="admin-only nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-user-cog w-5 text-slate-400"></i> <span>User Management</span>
+            </button>
+            <button onclick="switchView('settings')" id="nav-settings"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-cog w-5 text-slate-400"></i> <span>Settings</span>
+            </button>
+        </nav>
+        <div class="p-4 border-t border-slate-700/50">
+            <div class="flex items-center gap-3 px-2 mb-3">
+                <div id="user-avatar"
+                    class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                    --</div>
+                <div>
+                    <p class="text-sm font-medium text-white" id="user-display-name">Loading...</p>
+                    <p class="text-xs text-slate-500" id="user-role">--</p>
+                </div>
+            </div>
+            <button onclick="logout()"
+                class="w-full text-left flex items-center gap-2 px-2 py-2 text-sm text-slate-400 hover:text-red-400 transition">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-10 backdrop-blur-xl bg-slate-900/80 border-b border-slate-700/50 px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold text-white" id="page-title">Dashboard Overview</h2>
+                    <p class="text-sm text-slate-500" id="page-subtitle">Real-time metrics from Excel data source</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="status-pulse w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span class="text-slate-400">Live • Auto-refresh <span id="countdown">30</span>s</span>
+                    </div>
+                    <button id="btn-new-ticket" onclick="openNewTicketModal()"
+                        class="admin-only bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition text-white">
+                        <i class="fas fa-plus"></i> New Ticket
+                    </button>
+                    <button onclick="loadData()"
+                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition text-white">
+                        <i class="fas fa-sync-alt" id="refresh-icon"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="p-8">
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="view-section">
+                <!-- KPI Row -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="card kpi-glow rounded-xl p-6 transition-all duration-300">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Tickets</p>
+                                <p class="text-4xl font-bold text-white mt-2" id="kpi-total">-</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                                <i class="fas fa-layer-group text-blue-400 text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-6 transition-all duration-300">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Open Tickets</p>
+                                <p class="text-4xl font-bold text-amber-400 mt-2" id="kpi-open">-</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                <i class="fas fa-clock text-amber-400 text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-6 transition-all duration-300">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Closed / Resolved
+                                </p>
+                                <p class="text-4xl font-bold text-emerald-400 mt-2" id="kpi-closed">-</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-emerald-400 text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-6 transition-all duration-300">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Critical Open</p>
+                                <p class="text-4xl font-bold text-red-500 mt-2" id="kpi-critical">-</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                                <i class="fas fa-exclamation-triangle text-red-400 text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-sm font-semibold text-white mb-4">Ticket Status</h3>
+                        <div class="h-56"><canvas id="statusChart"></canvas></div>
+                    </div>
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-sm font-semibold text-white mb-4">Priority Levels</h3>
+                        <div class="h-56"><canvas id="priorityChart"></canvas></div>
+                    </div>
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-sm font-semibold text-white mb-4">Request Types</h3>
+                        <div class="h-56"><canvas id="requestTypeChart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Recent Tickets -->
+                <div class="card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-semibold text-white">Recent Tickets</h3>
+                        <a href="#" onclick="switchView('tickets')"
+                            class="text-xs text-blue-400 hover:text-blue-300">View All →</a>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-xs text-slate-500 uppercase border-b border-slate-700">
+                                <tr>
+                                    <th class="py-3 text-left">ID</th>
+                                    <th class="py-3 text-left">Title</th>
+                                    <th class="py-3 text-center">Status</th>
+                                    <th class="py-3 text-center">Priority</th>
+                                    <th class="py-3 text-left">Assigned</th>
+                                    <th class="py-3 text-left">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-tickets"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: ALL TICKETS -->
+            <div id="view-tickets" class="view-section hidden">
+                <div class="card rounded-xl p-6 mb-6">
+                    <div class="flex flex-col md:flex-row gap-4 justify-between">
+                        <div class="relative flex-1 max-w-md">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            <input type="text" id="ticket-search" onkeyup="filterTickets()" placeholder="Search..."
+                                class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex gap-3">
+                            <select id="status-filter" onchange="filterTickets()"
+                                class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm">
+                                <option value="">All Statuses</option>
+                                <option value="Open">Open</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Waiting for Info">Waiting for Info</option>
+                                <option value="Resolved">Resolved</option>
+                                <option value="Closed">Closed</option>
+                            </select>
+                            <select id="priority-filter" onchange="filterTickets()"
+                                class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm">
+                                <option value="">All Priorities</option>
+                                <option value="Critical">Critical</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto max-h-[600px]">
+                        <table class="w-full text-sm">
+                            <thead
+                                class="text-xs text-slate-500 uppercase border-b border-slate-700 sticky top-0 bg-slate-800">
+                                <tr>
+                                    <th class="py-3 px-4 text-left">ID</th>
+                                    <th class="py-3 px-4 text-left">Title</th>
+                                    <th class="py-3 px-4 text-center">Status</th>
+                                    <th class="py-3 px-4 text-center">Priority</th>
+                                    <th class="py-3 px-4 text-left">Assigned</th>
+                                    <th class="py-3 px-4 text-left">Date</th>
+                                    <th class="py-3 px-4 text-center">Days</th>
+                                </tr>
+                            </thead>
+                            <tbody id="all-tickets"></tbody>
+                        </table>
+                    </div>
+                    <div class="border-t border-slate-700 p-4 flex justify-between text-xs text-slate-500">
+                        <span>Showing <span id="ticket-count">0</span> tickets • Click any row for details</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: COLOR LEGEND -->
+            <div id="view-legend" class="view-section hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
+                                class="fas fa-palette text-blue-400"></i> Status Colors</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-emerald-500"></span>
+                                <span class="font-medium text-white">Closed</span>
+                                <span class="text-slate-400 text-sm ml-auto">Ticket fully completed and archived</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-teal-500"></span>
+                                <span class="font-medium text-white">Resolved</span>
+                                <span class="text-slate-400 text-sm ml-auto">Solution provided, awaiting
+                                    confirmation</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-blue-500"></span>
+                                <span class="font-medium text-white">In Progress</span>
+                                <span class="text-slate-400 text-sm ml-auto">Currently being worked on</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-amber-500"></span>
+                                <span class="font-medium text-white">Waiting for Info</span>
+                                <span class="text-slate-400 text-sm ml-auto">Pending additional information from
+                                    requester</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-red-500"></span>
+                                <span class="font-medium text-white">Open</span>
+                                <span class="text-slate-400 text-sm ml-auto">Newly created, not yet assigned</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
+                                class="fas fa-exclamation-triangle text-amber-400"></i> Priority Levels</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-red-500"></span>
+                                <span class="font-medium text-red-400">Critical</span>
+                                <span class="text-slate-400 text-sm ml-auto">System-wide outages, major impact, needs
+                                    immediate action</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-orange-500"></span>
+                                <span class="font-medium text-orange-400">High</span>
+                                <span class="text-slate-400 text-sm ml-auto">Key business functions affected, resolve
+                                    within 24-48h</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-amber-500"></span>
+                                <span class="font-medium text-amber-400">Medium</span>
+                                <span class="text-slate-400 text-sm ml-auto">Individual users affected, some
+                                    inconvenience</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-green-500"></span>
+                                <span class="font-medium text-green-400">Low</span>
+                                <span class="text-slate-400 text-sm ml-auto">Minor issues, standard requests, no daily
+                                    impact</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-6 lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
+                                class="fas fa-clock text-red-400"></i> Days Open Indicators</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-red-500"></span>
+                                <span class="font-medium text-red-400">&gt; 7 Days (Alert)</span>
+                                <span class="text-slate-400 text-sm ml-auto">Requires immediate attention</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-amber-500"></span>
+                                <span class="font-medium text-amber-400">4-7 Days (Warning)</span>
+                                <span class="text-slate-400 text-sm ml-auto">Should be prioritized</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-slate-500"></span>
+                                <span class="font-medium text-slate-300">&lt; 4 Days</span>
+                                <span class="text-slate-400 text-sm ml-auto">Within normal SLA</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: TEAM -->
+            <div id="view-team" class="view-section hidden">
+                <div class="card rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-6">Staff Workload Distribution</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-xs text-slate-500 uppercase border-b border-slate-700">
+                                <tr>
+                                    <th class="py-3 text-left">Staff Member</th>
+                                    <th class="py-3 text-center">Assigned</th>
+                                    <th class="py-3 text-center">Open</th>
+                                    <th class="py-3 text-left">Workload</th>
+                                </tr>
+                            </thead>
+                            <tbody id="team-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: USERS -->
+            <div id="view-users" class="view-section hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                            <i class="fas fa-users text-blue-400"></i> All Users
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-xs text-slate-500 uppercase border-b border-slate-700">
+                                    <tr>
+                                        <th class="py-3 text-left">Username</th>
+                                        <th class="py-3 text-left">Display Name</th>
+                                        <th class="py-3 text-center">Role</th>
+                                        <th class="py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                            <i class="fas fa-user-plus text-green-400"></i> Create New User
+                        </h3>
+                        <form id="create-user-form" class="space-y-4">
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">Username</label>
+                                <input type="text" id="new-username" required
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">Display Name</label>
+                                <input type="text" id="new-display-name" required
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">Password</label>
+                                <input type="password" id="new-password" required
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">Role</label>
+                                <select id="new-role"
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                                    <option value="viewer">Viewer (Read-only)</option>
+                                    <option value="admin">Admin (Full access)</option>
+                                </select>
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition">
+                                <i class="fas fa-user-plus mr-2"></i> Create User
+                            </button>
+                        </form>
+                        <div id="create-user-msg" class="mt-4 hidden"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="view-section hidden">
+                <div class="max-w-md">
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                            <i class="fas fa-key text-amber-400"></i> Change Password
+                        </h3>
+                        <form id="change-password-form" class="space-y-4">
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">Current Password</label>
+                                <input type="password" id="current-password" required
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">New Password</label>
+                                <input type="password" id="new-password-change" required
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 uppercase mb-1">Confirm New Password</label>
+                                <input type="password" id="confirm-password" required
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            </div>
+                            <button type="submit"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition">
+                                <i class="fas fa-save mr-2"></i> Update Password
+                            </button>
+                        </form>
+                        <div id="change-password-msg" class="mt-4 hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- TICKET DETAIL MODAL -->
+    <div id="ticket-modal"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="modal-window bg-slate-800 rounded-xl w-full max-w-2xl border border-slate-700 overflow-hidden">
+            <!-- Title Bar -->
+            <div class="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-700">
+                <div class="flex items-center gap-3">
+                    <span class="font-mono text-blue-400 text-sm" id="modal-ticket-id">IT-00000000</span>
+                    <span id="modal-status-badge"></span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button onclick="minimizeModal()"
+                        class="w-8 h-8 rounded hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white"><i
+                            class="fas fa-minus text-xs"></i></button>
+                    <button onclick="maximizeModal()"
+                        class="w-8 h-8 rounded hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white"><i
+                            class="fas fa-expand text-xs"></i></button>
+                    <button onclick="closeModal()"
+                        class="w-8 h-8 rounded hover:bg-red-600 flex items-center justify-center text-slate-400 hover:text-white"><i
+                            class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <!-- Content -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto" id="modal-content">
+                <h2 class="text-xl font-bold text-white mb-4" id="modal-title">Ticket Title</h2>
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase">Priority</p>
+                        <p id="modal-priority" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase">Request Type</p>
+                        <p id="modal-type" class="text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase">Assigned To</p>
+                        <p id="modal-assigned" class="text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase">Requester</p>
+                        <p id="modal-requester" class="text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase">Date Opened</p>
+                        <p id="modal-date" class="text-white"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase">Days Open</p>
+                        <p id="modal-days" class="text-white"></p>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <p class="text-xs text-slate-500 uppercase mb-2">Description</p>
+                    <div class="bg-slate-900 p-4 rounded-lg text-slate-300 text-sm" id="modal-description">-</div>
+                </div>
+                <div class="mb-6">
+                    <p class="text-xs text-slate-500 uppercase mb-2">Resolution Notes</p>
+                    <div class="bg-slate-900 p-4 rounded-lg text-slate-300 text-sm" id="modal-resolution">-</div>
+                </div>
+            </div>
+            <!-- Actions -->
+            <div class="bg-slate-900 px-6 py-4 flex justify-between border-t border-slate-700">
+                <button onclick="deleteCurrentTicket()"
+                    class="admin-only px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/40 text-sm font-medium"><i
+                        class="fas fa-trash mr-2"></i>Delete</button>
+                <button onclick="editCurrentTicket()"
+                    class="admin-only px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><i
+                        class="fas fa-edit mr-2"></i>Edit Ticket</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW/EDIT TICKET MODAL -->
+    <div id="edit-modal"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="modal-window bg-slate-800 rounded-xl w-full max-w-xl border border-slate-700 overflow-hidden">
+            <div class="bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-700">
+                <span class="font-semibold text-white" id="edit-modal-title">New Ticket</span>
+                <button onclick="closeEditModal()"
+                    class="w-8 h-8 rounded hover:bg-red-600 flex items-center justify-center text-slate-400 hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form id="ticket-form" class="p-6 space-y-4">
+                <input type="hidden" id="form-ticket-id">
+                <div>
+                    <label class="block text-xs text-slate-500 uppercase mb-1">Title</label>
+                    <input type="text" id="form-title"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500"
+                        required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-500 uppercase mb-1">Status</label>
+                        <select id="form-status"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            <option>Open</option>
+                            <option>In Progress</option>
+                            <option>Waiting for Info</option>
+                            <option>Resolved</option>
+                            <option>Closed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 uppercase mb-1">Priority</label>
+                        <select id="form-priority"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                            <option>Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-500 uppercase mb-1">Request Type</label>
+                        <select id="form-type"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 uppercase mb-1">Assigned To</label>
+                        <input type="text" id="form-assigned"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 uppercase mb-1">Requester</label>
+                    <input type="text" id="form-requester"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 uppercase mb-1">Description</label>
+                    <textarea id="form-description" rows="3"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 uppercase mb-1">Resolution Notes</label>
+                    <textarea id="form-resolution" rows="2"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white"></textarea>
+                </div>
+            </form>
+            <div class="bg-slate-900 px-6 py-4 flex justify-end gap-3 border-t border-slate-700">
+                <button onclick="closeEditModal()"
+                    class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 text-sm">Cancel</button>
+                <button onclick="saveTicket()"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><i
+                        class="fas fa-save mr-2"></i>Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allTickets = [];
+        let statsData = {};
+        let countdown = 30;
+        let currentTicket = null;
+        let currentUser = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadUserInfo();
+            loadData();
+            setInterval(() => { countdown--; document.getElementById('countdown').innerText = countdown; if (countdown <= 0) { loadData(); countdown = 30; } }, 1000);
+        });
+
+        async function loadUserInfo() {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    currentUser = await res.json();
+                    // Update sidebar user display
+                    const initials = currentUser.display_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    document.getElementById('user-avatar').innerText = initials;
+                    document.getElementById('user-display-name').innerText = currentUser.display_name;
+                    document.getElementById('user-role').innerText = currentUser.role === 'admin' ? 'Administrator' : 'Viewer';
+                    applyRoleBasedUI();
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (e) {
+                console.error('Error loading user:', e);
+            }
+        }
+
+        function applyRoleBasedUI() {
+            const isAdmin = currentUser && currentUser.role === 'admin';
+            // Hide/show admin-only elements
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = isAdmin ? '' : 'none';
+            });
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (e) {
+                console.error('Logout error:', e);
+            }
+        }
+
+        async function loadData() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('fa-spin');
+            countdown = 30;
+            try {
+                const [statsRes, ticketsRes] = await Promise.all([fetch('/api/stats'), fetch('/api/tickets')]);
+                statsData = await statsRes.json();
+                allTickets = await ticketsRes.json();
+                renderKPIs(statsData);
+                renderCharts(statsData);
+                renderRecentTickets(allTickets.slice(0, 8));
+                renderAllTickets(allTickets);
+                renderTeam(statsData.staff_workload);
+            } catch (e) { console.error("Error:", e); }
+            icon.classList.remove('fa-spin');
+        }
+
+        function renderKPIs(s) {
+            document.getElementById('kpi-total').innerText = s.total;
+            document.getElementById('kpi-open').innerText = s.open;
+            document.getElementById('kpi-closed').innerText = s.closed;
+            document.getElementById('kpi-critical').innerText = s.critical;
+        }
+
+        function renderCharts(s) {
+            createDoughnutChart('statusChart', s.statuses, ['#22c55e', '#14b8a6', '#3b82f6', '#f59e0b', '#ef4444']);
+            createDoughnutChart('priorityChart', s.priorities, ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6b7280']);
+            createHorizontalBarChart('requestTypeChart', s.request_types);
+        }
+
+        function createDoughnutChart(id, data, colors) {
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            if (window[id] instanceof Chart) window[id].destroy();
+            window[id] = new Chart(ctx.getContext('2d'), {
+                type: 'doughnut',
+                data: { labels: Object.keys(data), datasets: [{ data: Object.values(data), backgroundColor: colors, borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true } } } }
+            });
+        }
+
+        function createHorizontalBarChart(id, data) {
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            if (window[id] instanceof Chart) window[id].destroy();
+            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            window[id] = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: { labels: sorted.map(x => x[0]), datasets: [{ data: sorted.map(x => x[1]), backgroundColor: '#3b82f6', borderRadius: 4 }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } } } }
+            });
+        }
+
+        function getStatusBadge(status) {
+            const colors = { 'Closed': 'bg-emerald-500/20 text-emerald-400', 'Resolved': 'bg-teal-500/20 text-teal-400', 'In Progress': 'bg-blue-500/20 text-blue-400', 'Waiting for Info': 'bg-amber-500/20 text-amber-400' };
+            return `<span class="px-2 py-1 rounded text-xs font-medium ${colors[status] || 'bg-red-500/20 text-red-400'}">${status}</span>`;
+        }
+
+        function getPriorityText(priority) {
+            const colors = { 'Critical': 'text-red-500 font-bold', 'High': 'text-orange-400 font-semibold', 'Medium': 'text-amber-400', 'Low': 'text-green-400' };
+            return `<span class="${colors[priority] || 'text-slate-400'}">${priority}</span>`;
+        }
+
+        function renderRecentTickets(tickets) {
+            document.getElementById('recent-tickets').innerHTML = tickets.map(t => `
+                <tr class="ticket-row border-b border-slate-700/50" onclick="openTicketModal('${t.ticket_id}')">
+                    <td class="py-3 font-mono text-xs text-blue-400">${t.ticket_id}</td>
+                    <td class="py-3 text-white max-w-xs truncate">${t.title}</td>
+                    <td class="py-3 text-center">${getStatusBadge(t.status)}</td>
+                    <td class="py-3 text-center">${getPriorityText(t.priority)}</td>
+                    <td class="py-3 text-slate-400">${t.staff_assigned || '-'}</td>
+                    <td class="py-3 text-slate-500 text-xs">${t.date_opened}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderAllTickets(tickets) {
+            document.getElementById('all-tickets').innerHTML = tickets.map(t => {
+                // Handle '-' for closed/resolved tickets
+                let daysClass = 'text-slate-500';
+                if (t.days_open !== '-' && typeof t.days_open === 'number') {
+                    daysClass = t.days_open > 7 ? 'text-red-400 font-bold' : t.days_open > 4 ? 'text-amber-400' : 'text-slate-500';
+                }
+                return `
+                    <tr class="ticket-row border-b border-slate-700/50" onclick="openTicketModal('${t.ticket_id}')">
+                        <td class="py-3 px-4 font-mono text-xs text-blue-400">${t.ticket_id}</td>
+                        <td class="py-3 px-4 text-white max-w-sm truncate">${t.title}</td>
+                        <td class="py-3 px-4 text-center">${getStatusBadge(t.status)}</td>
+                        <td class="py-3 px-4 text-center text-xs">${getPriorityText(t.priority)}</td>
+                        <td class="py-3 px-4 text-slate-400">${t.staff_assigned || '-'}</td>
+                        <td class="py-3 px-4 text-slate-500 text-xs">${t.date_opened}</td>
+                        <td class="py-3 px-4 text-center text-xs ${daysClass}">${t.days_open}</td>
+                    </tr>
+                `;
+            }).join('');
+            document.getElementById('ticket-count').innerText = tickets.length;
+        }
+
+        function filterTickets() {
+            const search = document.getElementById('ticket-search').value.toLowerCase();
+            const status = document.getElementById('status-filter').value;
+            const priority = document.getElementById('priority-filter').value;
+            const filtered = allTickets.filter(t => {
+                const matchSearch = t.ticket_id.toLowerCase().includes(search) || t.title.toLowerCase().includes(search) || (t.staff_assigned || '').toLowerCase().includes(search);
+                return matchSearch && (!status || t.status === status) && (!priority || t.priority === priority);
+            });
+            renderAllTickets(filtered);
+        }
+
+        function renderTeam(workload) {
+            const tbody = document.getElementById('team-table');
+            if (!workload) return;
+            const maxOpen = Math.max(...Object.values(workload).map(x => x.open), 1);
+            tbody.innerHTML = Object.entries(workload).map(([name, data]) => {
+                const pct = Math.round((data.open / maxOpen) * 100);
+                const color = data.open > 5 ? 'bg-red-500' : data.open > 2 ? 'bg-amber-500' : 'bg-emerald-500';
+                return `<tr class="border-b border-slate-700/50"><td class="py-3 text-white font-medium">${name}</td><td class="py-3 text-center text-slate-300">${data.assigned}</td><td class="py-3 text-center font-bold ${data.open > 5 ? 'text-red-400' : 'text-emerald-400'}">${data.open}</td><td class="py-3"><div class="h-2 bg-slate-700 rounded-full w-32"><div class="${color} h-full rounded-full" style="width:${pct}%"></div></div></td></tr>`;
+            }).join('');
+        }
+
+        function switchView(name) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-' + name).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + name).classList.add('active');
+            const titles = {
+                dashboard: ['Dashboard Overview', 'Real-time metrics from Excel'],
+                tickets: ['All Tickets', 'Click any row for full details'],
+                legend: ['Color Legend', 'Status and priority color explanations'],
+                team: ['Team Workload', 'Staff assignment distribution'],
+                users: ['User Management', 'Create and manage user accounts'],
+                settings: ['Settings', 'Account preferences']
+            };
+            document.getElementById('page-title').innerText = titles[name][0];
+            document.getElementById('page-subtitle').innerText = titles[name][1];
+
+            // Load users when switching to users view
+            if (name === 'users') loadUsers();
+        }
+
+        // --- MODAL FUNCTIONS ---
+        function openTicketModal(ticketId) {
+            currentTicket = allTickets.find(t => t.ticket_id === ticketId);
+            if (!currentTicket) return;
+            document.getElementById('modal-ticket-id').innerText = currentTicket.ticket_id;
+            document.getElementById('modal-status-badge').innerHTML = getStatusBadge(currentTicket.status);
+            document.getElementById('modal-title').innerText = currentTicket.title;
+            document.getElementById('modal-priority').innerHTML = getPriorityText(currentTicket.priority);
+            document.getElementById('modal-type').innerText = currentTicket.request_type || '-';
+            document.getElementById('modal-assigned').innerText = currentTicket.staff_assigned || '-';
+            document.getElementById('modal-requester').innerText = currentTicket.requester || '-';
+            document.getElementById('modal-date').innerText = currentTicket.date_opened || '-';
+            document.getElementById('modal-days').innerText = currentTicket.days_open || '0';
+            document.getElementById('modal-description').innerText = currentTicket.description || 'No description provided.';
+            document.getElementById('modal-resolution').innerText = currentTicket.resolution_notes || 'No resolution notes yet.';
+            document.getElementById('ticket-modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('ticket-modal').classList.add('hidden'); currentTicket = null; }
+        function minimizeModal() { document.querySelector('#ticket-modal .modal-window').classList.toggle('scale-75'); }
+        function maximizeModal() { document.querySelector('#ticket-modal .modal-window').classList.toggle('max-w-2xl'); document.querySelector('#ticket-modal .modal-window').classList.toggle('max-w-5xl'); }
+
+        // --- CRUD FUNCTIONS ---
+        let dropdownOptions = { request_types: [], staff: [], requesters: [] };
+
+        async function loadDropdownOptions() {
+            try {
+                const res = await fetch('/api/options');
+                dropdownOptions = await res.json();
+            } catch (e) { console.error('Error loading options:', e); }
+        }
+
+        function populateRequestTypeDropdown(selectedType = '') {
+            const typeSelect = document.getElementById('form-type');
+            typeSelect.innerHTML = '<option value="">Select...</option>' +
+                dropdownOptions.request_types.map(t => `<option value="${t}" ${t === selectedType ? 'selected' : ''}>${t}</option>`).join('');
+        }
+
+        async function openNewTicketModal() {
+            await loadDropdownOptions();
+            populateRequestTypeDropdown();
+            document.getElementById('edit-modal-title').innerText = 'New Ticket';
+            document.getElementById('form-ticket-id').value = '';
+            document.getElementById('form-title').value = '';
+            document.getElementById('form-status').value = 'Open';
+            document.getElementById('form-priority').value = 'Low';
+            document.getElementById('form-type').value = '';
+            document.getElementById('form-assigned').value = '';
+            document.getElementById('form-requester').value = '';
+            document.getElementById('form-description').value = '';
+            document.getElementById('form-resolution').value = '';
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        async function editCurrentTicket() {
+            if (!currentTicket) return;
+            // Save ticket data before closing modal (which nullifies currentTicket)
+            const ticket = { ...currentTicket };
+            closeModal();
+            await loadDropdownOptions();
+            populateRequestTypeDropdown(ticket.request_type);
+            document.getElementById('edit-modal-title').innerText = 'Edit ' + ticket.ticket_id;
+            document.getElementById('form-ticket-id').value = ticket.ticket_id;
+            document.getElementById('form-title').value = ticket.title;
+            document.getElementById('form-status').value = ticket.status;
+            document.getElementById('form-priority').value = ticket.priority;
+            document.getElementById('form-assigned').value = ticket.staff_assigned || '';
+            document.getElementById('form-requester').value = ticket.requester || '';
+            document.getElementById('form-description').value = ticket.description || '';
+            document.getElementById('form-resolution').value = ticket.resolution_notes || '';
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+        async function saveTicket() {
+            const ticketId = document.getElementById('form-ticket-id').value;
+            const data = {
+                title: document.getElementById('form-title').value,
+                status: document.getElementById('form-status').value,
+                priority: document.getElementById('form-priority').value,
+                request_type: document.getElementById('form-type').value,
+                staff_assigned: document.getElementById('form-assigned').value,
+                requester: document.getElementById('form-requester').value,
+                description: document.getElementById('form-description').value,
+                resolution_notes: document.getElementById('form-resolution').value
+            };
+            try {
+                const url = ticketId ? `/api/tickets/${ticketId}` : '/api/tickets';
+                const method = ticketId ? 'PUT' : 'POST';
+                const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                if (res.ok) { closeEditModal(); loadData(); } else { alert('Error saving ticket'); }
+            } catch (e) { alert('Network error'); }
+        }
+
+        async function deleteCurrentTicket() {
+            if (!currentTicket || !confirm(`Delete ticket ${currentTicket.ticket_id}?`)) return;
+            try {
+                const res = await fetch(`/api/tickets/${currentTicket.ticket_id}`, { method: 'DELETE' });
+                if (res.ok) { closeModal(); loadData(); } else { alert('Error deleting'); }
+            } catch (e) { alert('Network error'); }
+        }
+
+        // --- USER MANAGEMENT ---
+        let allUsers = [];
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/users');
+                if (res.ok) {
+                    allUsers = await res.json();
+                    renderUsers();
+                }
+            } catch (e) { console.error('Error loading users:', e); }
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('users-table');
+            tbody.innerHTML = allUsers.map(u => `
+                <tr class="border-b border-slate-700/50">
+                    <td class="py-3">${u.username}</td>
+                    <td class="py-3">${u.display_name}</td>
+                    <td class="py-3 text-center">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-400'}">
+                            ${u.role === 'admin' ? 'Admin' : 'Viewer'}
+                        </span>
+                    </td>
+                    <td class="py-3 text-right">
+                        ${u.username === 'admin' ? '<span class="text-xs text-slate-500">Protected</span>' :
+                    `<button onclick="deleteUser('${u.username}')" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-trash"></i></button>`}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function deleteUser(username) {
+            if (!confirm(`Delete user ${username}?`)) return;
+            try {
+                const res = await fetch(`/api/users/${username}`, { method: 'DELETE' });
+                if (res.ok) { loadUsers(); } else { alert('Error deleting user'); }
+            } catch (e) { alert('Network error'); }
+        }
+
+        document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('create-user-msg');
+            const data = {
+                username: document.getElementById('new-username').value,
+                display_name: document.getElementById('new-display-name').value,
+                password: document.getElementById('new-password').value,
+                role: document.getElementById('new-role').value
+            };
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    msgEl.className = 'mt-4 p-3 rounded bg-green-500/20 text-green-400 text-sm';
+                    msgEl.textContent = 'User created successfully!';
+                    msgEl.classList.remove('hidden');
+                    document.getElementById('create-user-form').reset();
+                    loadUsers();
+                } else {
+                    msgEl.className = 'mt-4 p-3 rounded bg-red-500/20 text-red-400 text-sm';
+                    msgEl.textContent = result.error || 'Error creating user';
+                    msgEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                msgEl.className = 'mt-4 p-3 rounded bg-red-500/20 text-red-400 text-sm';
+                msgEl.textContent = 'Network error';
+                msgEl.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('change-password-msg');
+            const newPass = document.getElementById('new-password-change').value;
+            const confirmPass = document.getElementById('confirm-password').value;
+
+            if (newPass !== confirmPass) {
+                msgEl.className = 'mt-4 p-3 rounded bg-red-500/20 text-red-400 text-sm';
+                msgEl.textContent = 'Passwords do not match';
+                msgEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        current_password: document.getElementById('current-password').value,
+                        new_password: newPass
+                    })
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    msgEl.className = 'mt-4 p-3 rounded bg-green-500/20 text-green-400 text-sm';
+                    msgEl.textContent = 'Password updated successfully!';
+                    msgEl.classList.remove('hidden');
+                    document.getElementById('change-password-form').reset();
+                } else {
+                    msgEl.className = 'mt-4 p-3 rounded bg-red-500/20 text-red-400 text-sm';
+                    msgEl.textContent = result.error || 'Error changing password';
+                    msgEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                msgEl.className = 'mt-4 p-3 rounded bg-red-500/20 text-red-400 text-sm';
+                msgEl.textContent = 'Network error';
+                msgEl.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

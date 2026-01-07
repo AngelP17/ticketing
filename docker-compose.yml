@@ -1,0 +1,49 @@
+# IT Operations Dashboard - Docker Compose
+# Orchestrates three services: Flask app, Nginx reverse proxy, and ETL pipeline
+#
+# Usage:
+#   Start:   docker-compose up --build
+#   Stop:    docker-compose down
+#   Logs:    docker-compose logs -f
+#
+# Access: http://localhost (port 80)
+
+version: '3.8'
+
+services:
+  # The Flask Application (with Gunicorn)
+  web:
+    build: .
+    volumes:
+      # Mount current directory for live updates to Excel and database
+      - .:/app
+    environment:
+      - FLASK_ENV=production
+    restart: always
+    # Internal network only - accessed through nginx
+
+    # Reverse Proxy (Nginx)
+    # Professional front-end that handles traffic, caching, and security headers
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+    restart: always
+
+  # Background ETL Service
+  # Continuously syncs Excel data to SQLite database
+  etl:
+    build: .
+    command: python etl_pipeline.py
+    volumes:
+      # Mount for access to Excel file and database
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: always
+    depends_on:
+      - web
