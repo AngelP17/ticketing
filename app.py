@@ -35,9 +35,20 @@ def load_users():
     """Load users from JSON file."""
     try:
         users_path = get_users_file()
+        print(f"[AUTH] Loading users from: {users_path}")
         with open(users_path, 'r') as f:
-            return json.load(f).get('users', [])
-    except:
+            data = json.load(f)
+            users = data.get('users', [])
+            print(f"[AUTH] Loaded {len(users)} users successfully")
+            return users
+    except FileNotFoundError:
+        print(f"[AUTH] ERROR: Users file not found at any location: {USERS_FILE_LOCATIONS}")
+        return []
+    except json.JSONDecodeError as e:
+        print(f"[AUTH] ERROR: Invalid JSON in users file: {e}")
+        return []
+    except Exception as e:
+        print(f"[AUTH] ERROR: Failed to load users: {e}")
         return []
 
 def save_users(users):
@@ -502,6 +513,32 @@ def delete_ticket(ticket_id):
 @app.route('/api/refresh', methods=['POST'])
 def api_refresh():
     return jsonify({'status': 'success', 'message': 'Data refreshed from Excel'})
+
+# Startup diagnostics for authentication
+def print_auth_diagnostics():
+    """Print authentication setup diagnostics."""
+    print("\n" + "="*50)
+    print(" AUTHENTICATION DIAGNOSTICS")
+    print("="*50)
+    for path in USERS_FILE_LOCATIONS:
+        exists = os.path.exists(path)
+        status = "FOUND" if exists else "not found"
+        print(f"  {path}: {status}")
+
+    users_file = get_users_file()
+    print(f"\n  Active users file: {users_file}")
+
+    users = load_users()
+    if users:
+        print(f"  Users loaded: {len(users)}")
+        for u in users:
+            print(f"    - {u.get('username')} ({u.get('role')})")
+    else:
+        print("  WARNING: No users loaded! Login will fail.")
+    print("="*50 + "\n")
+
+# Run diagnostics on startup (including when gunicorn starts)
+print_auth_diagnostics()
 
 if __name__ == '__main__':
     print("\n" + "="*50)
