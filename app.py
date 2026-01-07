@@ -13,13 +13,29 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ticketing-dashboard-secret-key-2025')
 EXCEL_FILE = 'tickets.xlsx'
 SHEET_NAME = 'IT Service Tickets'
-USERS_FILE = '.env/users.json'
+
+# Check multiple locations for users file (local dev, Render secrets, Docker)
+USERS_FILE_LOCATIONS = [
+    '.env/users.json',              # Local development
+    '/etc/secrets/users_data.json', # Render secret files
+    'users.json',                   # Working directory fallback
+]
+
+def get_users_file():
+    """Find the users file from multiple possible locations."""
+    for path in USERS_FILE_LOCATIONS:
+        if os.path.exists(path):
+            return path
+    return USERS_FILE_LOCATIONS[0]  # Default to first option
+
+USERS_FILE = get_users_file()
 
 # --- USER MANAGEMENT ---
 def load_users():
     """Load users from JSON file."""
     try:
-        with open(USERS_FILE, 'r') as f:
+        users_path = get_users_file()
+        with open(users_path, 'r') as f:
             return json.load(f).get('users', [])
     except:
         return []
