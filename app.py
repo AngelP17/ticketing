@@ -33,13 +33,52 @@ def get_users_file():
 USERS_FILE = get_users_file()
 
 # --- DATABASE FUNCTIONS ---
+def clean_database_url(url):
+    """Clean database URL by removing unsupported parameters for psycopg2."""
+    if not url:
+        return url
+
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+    try:
+        parsed = urlparse(url)
+
+        # Parse query parameters
+        params = parse_qs(parsed.query)
+
+        # Remove unsupported parameters (like channel_binding from Neon)
+        unsupported = ['channel_binding', 'options']
+        for param in unsupported:
+            params.pop(param, None)
+
+        # Flatten params (parse_qs returns lists)
+        clean_params = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+
+        # Reconstruct URL
+        new_query = urlencode(clean_params)
+        clean_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
+
+        print(f"[DB] Cleaned URL parameters: removed {[p for p in unsupported if p in parse_qs(parsed.query)]}")
+        return clean_url
+    except Exception as e:
+        print(f"[DB] Warning: Could not parse URL, using as-is: {e}")
+        return url
+
 def get_db_connection():
     """Get a database connection."""
     if not DATABASE_URL:
         print("[DB] ERROR: DATABASE_URL not set!")
         return None
     try:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        clean_url = clean_database_url(DATABASE_URL)
+        conn = psycopg2.connect(clean_url, cursor_factory=RealDictCursor)
         return conn
     except Exception as e:
         print(f"[DB] ERROR: Failed to connect to database: {e}")
