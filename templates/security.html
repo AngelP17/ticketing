@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOC Dashboard | Enterprise Security</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: #0a0e1a;
+            color: #e2e8f0;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: linear-gradient(180deg, #111827 0%, #0a0e1a 100%);
+            border-right: 1px solid #1e293b;
+        }
+
+        .nav-item {
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-left-color: #3b82f6;
+        }
+
+        .nav-item:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Cards */
+        .metric-card {
+            background: #111827;
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .metric-card:hover {
+            border-color: #374151;
+            transform: translateY(-2px);
+        }
+
+        /* Status indicators */
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Scanning animation */
+        .scanning {
+            animation: scan 1.5s ease-in-out infinite;
+        }
+
+        @keyframes scan {
+
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* Toast notifications */
+        .toast {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip .tooltip-content {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 8px 12px;
+            white-space: nowrap;
+            z-index: 50;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+
+        .tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0e1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+
+        /* Event severity colors */
+        .severity-critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .severity-high {
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .severity-medium {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        .severity-low {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 fixed inset-y-0 left-0 flex flex-col z-20">
+        <div class="p-5 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
+                    <i class="fas fa-shield-halved text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-white">SOC Dashboard</h1>
+                    <p class="text-xs text-slate-500">Enterprise Security</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-3 space-y-1">
+            <p class="text-xs text-slate-500 uppercase tracking-wider px-3 py-2">Operations</p>
+            <a href="/security" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
+                <i class="fas fa-th-large w-5 text-blue-400"></i> <span class="text-white font-medium">Dashboard</span>
+            </a>
+            <a href="#inventory" onclick="scrollToInventory()"
+                class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
+                <i class="fas fa-server w-5 text-slate-400"></i> <span>Inventory</span>
+            </a>
+            <a href="#" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
+                <i class="fas fa-project-diagram w-5 text-slate-400"></i> <span>Network Map</span>
+            </a>
+            <a href="#events" onclick="scrollToEvents()"
+                class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
+                <i class="fas fa-bolt w-5 text-slate-400"></i> <span>Security Events</span>
+            </a>
+            <a href="/" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
+                <i class="fas fa-users w-5 text-slate-400"></i> <span>IT Dashboard</span>
+            </a>
+            <a href="#" onclick="switchView('settings')"
+                class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm">
+                <i class="fas fa-cog w-5 text-slate-400"></i> <span>Settings</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center gap-3 mb-3">
+                <div id="user-avatar"
+                    class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                    --</div>
+                <div>
+                    <p class="text-sm font-medium text-white" id="user-display-name">Loading...</p>
+                    <p class="text-xs text-slate-500" id="user-role">--</p>
+                </div>
+            </div>
+            <button onclick="logout()"
+                class="w-full text-left flex items-center gap-2 px-2 py-2 text-sm text-slate-400 hover:text-red-400 transition">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-64 flex-1 min-h-screen">
+        <!-- Header -->
+        <header class="sticky top-0 z-10 px-6 py-4 border-b border-slate-800 bg-[#0a0e1a]/90 backdrop-blur-xl">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-6">
+                    <nav class="flex items-center gap-2 text-sm text-slate-400">
+                        <span>SOC</span>
+                        <i class="fas fa-chevron-right text-xs"></i>
+                        <span class="text-white">Dashboard</span>
+                    </nav>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="pulse-dot w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span class="text-slate-400">System Online</span>
+                    </div>
+                    <button id="scan-btn" onclick="triggerScan()"
+                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                        <i class="fas fa-radar" id="scan-icon"></i>
+                        <span id="scan-text">Scan Network</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-6">
+            <!-- KPI Cards Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <!-- Total Inventory -->
+                <div class="metric-card p-5">
+                    <div class="flex justify-between items-start mb-3">
+                        <p class="text-slate-400 text-sm">Total Inventory</p>
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <i class="fas fa-server text-blue-400 text-sm"></i>
+                        </div>
+                    </div>
+                    <h2 id="kpi-total" class="text-3xl font-bold text-white mb-1">0</h2>
+                    <p class="text-xs text-slate-500"><span id="kpi-online">0</span> online, <span
+                            id="kpi-offline">0</span> offline</p>
+                </div>
+
+                <!-- Security Risks -->
+                <div class="metric-card p-5 border-l-4 border-l-red-500">
+                    <div class="flex justify-between items-start mb-3">
+                        <p class="text-slate-400 text-sm">Security Risks</p>
+                        <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                            <i class="fas fa-exclamation-triangle text-red-400 text-sm"></i>
+                        </div>
+                    </div>
+                    <h2 id="kpi-risks" class="text-3xl font-bold text-red-400 mb-1">0</h2>
+                    <p class="text-xs text-slate-500">Active untrusted devices</p>
+                </div>
+
+                <!-- Network Health -->
+                <div class="metric-card p-5 border-l-4 border-l-emerald-500">
+                    <div class="flex justify-between items-start mb-3">
+                        <p class="text-slate-400 text-sm">Network Health</p>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                            <i class="fas fa-heartbeat text-emerald-400 text-sm"></i>
+                        </div>
+                    </div>
+                    <h2 id="kpi-health" class="text-3xl font-bold text-emerald-400 mb-1">100%</h2>
+                    <p class="text-xs text-slate-500">Uptime average</p>
+                </div>
+
+                <!-- Warnings -->
+                <div class="metric-card p-5 border-l-4 border-l-amber-500">
+                    <div class="flex justify-between items-start mb-3">
+                        <p class="text-slate-400 text-sm">Warnings</p>
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                            <i class="fas fa-bell text-amber-400 text-sm"></i>
+                        </div>
+                    </div>
+                    <h2 id="kpi-warnings" class="text-3xl font-bold text-amber-400 mb-1">0</h2>
+                    <p class="text-xs text-slate-500">Medium risk alerts</p>
+                </div>
+            </div>
+
+            <!-- Charts & Events Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Network Traffic Chart -->
+                <div class="metric-card p-5 lg:col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-white font-semibold">Network Traffic</h3>
+                            <p class="text-xs text-slate-500">Inbound vs Outbound traffic (MB/s) over last 24h</p>
+                        </div>
+                    </div>
+                    <div class="h-64"><canvas id="trafficChart"></canvas></div>
+                </div>
+
+                <!-- Security Events -->
+                <div id="events" class="metric-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-white font-semibold">Security Events</h3>
+                            <p class="text-xs text-slate-500">Real-time security alerts and logs</p>
+                        </div>
+                    </div>
+                    <div id="events-list" class="space-y-3 max-h-56 overflow-y-auto">
+                        <!-- Events injected by JS -->
+                    </div>
+                    <div id="events-empty" class="hidden text-center py-8 text-slate-500">
+                        <i class="fas fa-shield-check text-2xl mb-2"></i>
+                        <p class="text-sm">No security events</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Device Form (Admin Only) -->
+            <div id="add-device-section" class="admin-only metric-card p-5 mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <i class="fas fa-plus-circle text-emerald-400"></i>
+                    <h3 class="text-white font-semibold">Add Device</h3>
+                </div>
+                <form id="add-device-form" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <input type="text" id="new-ip" placeholder="IP Address *" required
+                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="new-hostname" placeholder="Hostname"
+                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="new-mac" placeholder="MAC Address"
+                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="new-vendor" placeholder="Vendor"
+                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="new-ports" placeholder="Open Ports (22, 80, 443)"
+                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <button type="submit"
+                        class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                        <i class="fas fa-plus mr-1"></i> Add
+                    </button>
+                </form>
+            </div>
+
+            <!-- Inventory Table -->
+            <div id="inventory" class="metric-card overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-800 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-white font-semibold">Recent Inventory</h3>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <i
+                                class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                            <input type="text" id="search-input" onkeyup="filterInventory()"
+                                placeholder="Search IP, MAC, Hostname..."
+                                class="bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm w-64 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <span class="text-xs text-slate-500">Showing <span id="device-count">0</span> devices</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-xs text-slate-500 uppercase border-b border-slate-800 bg-slate-900/50">
+                            <tr>
+                                <th class="px-5 py-3 text-left">Status</th>
+                                <th class="px-5 py-3 text-left">Hostname</th>
+                                <th class="px-5 py-3 text-left">IP Address</th>
+                                <th class="px-5 py-3 text-left">MAC Address</th>
+                                <th class="px-5 py-3 text-left">Vendor</th>
+                                <th class="px-5 py-3 text-center">Ports</th>
+                                <th class="px-5 py-3 text-center">Trust</th>
+                                <th class="px-5 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table" class="divide-y divide-slate-800">
+                            <!-- Data injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="inventory-empty" class="hidden p-12 text-center text-slate-500">
+                    <i class="fas fa-network-wired text-4xl mb-3"></i>
+                    <p class="font-medium">No devices discovered</p>
+                    <p class="text-sm mt-1">Run a network scan or add devices manually</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="px-6 py-4 border-t border-slate-800 text-center text-xs text-slate-500">
+            v1.0.4 Connected
+        </footer>
+    </main>
+
+    <script>
+        let currentUser = null;
+        let allDevices = [];
+        let trafficChart = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadUserInfo();
+            await Promise.all([loadStats(), loadInventory(), loadEvents()]);
+            initTrafficChart();
+
+            // Auto-refresh every 30 seconds
+            setInterval(async () => {
+                await Promise.all([loadStats(), loadInventory(), loadEvents()]);
+            }, 30000);
+        });
+
+        // Toast notifications
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-600',
+                error: 'bg-red-600',
+                warning: 'bg-amber-600',
+                info: 'bg-blue-600'
+            };
+            toast.className = `toast ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3`;
+            toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        async function loadUserInfo() {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    currentUser = await res.json();
+                    const initials = currentUser.display_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    document.getElementById('user-avatar').innerText = initials;
+                    document.getElementById('user-display-name').innerText = currentUser.display_name;
+                    document.getElementById('user-role').innerText = currentUser.role === 'admin' ? 'Administrator' : 'Viewer';
+                    applyRoleBasedUI();
+                } else {
+                    window.location.href = '/login';
+                }
+            } catch (e) {
+                console.error('Error loading user:', e);
+            }
+        }
+
+        function applyRoleBasedUI() {
+            const isAdmin = currentUser && currentUser.role === 'admin';
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = isAdmin ? '' : 'none';
+            });
+        }
+
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/security/stats');
+                const stats = await res.json();
+
+                document.getElementById('kpi-total').innerText = stats.total || 0;
+                document.getElementById('kpi-online').innerText = stats.online || 0;
+                document.getElementById('kpi-offline').innerText = stats.offline || 0;
+                document.getElementById('kpi-risks').innerText = stats.security_risks || 0;
+                document.getElementById('kpi-health').innerText = (stats.network_health || 100) + '%';
+                document.getElementById('kpi-warnings').innerText = stats.warnings || 0;
+            } catch (e) {
+                console.error('Error loading stats:', e);
+            }
+        }
+
+        async function loadEvents() {
+            try {
+                const res = await fetch('/api/security/events');
+                const events = await res.json();
+                const list = document.getElementById('events-list');
+                const empty = document.getElementById('events-empty');
+
+                if (events.length === 0) {
+                    list.classList.add('hidden');
+                    empty.classList.remove('hidden');
+                    return;
+                }
+
+                list.classList.remove('hidden');
+                empty.classList.add('hidden');
+
+                list.innerHTML = events.slice(0, 10).map(e => `
+                    <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition">
+                        <div class="w-2 h-2 mt-2 rounded-full ${e.severity === 'critical' ? 'bg-red-500' : e.severity === 'high' ? 'bg-orange-500' : e.severity === 'medium' ? 'bg-amber-500' : 'bg-green-500'}"></div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-white truncate">${e.description || e.event_type}</p>
+                            <p class="text-xs text-slate-500">${e.ip_address || ''}</p>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <p class="text-xs text-slate-400">${e.time}</p>
+                            <span class="text-xs px-2 py-0.5 rounded severity-${e.severity}">${e.severity}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Error loading events:', e);
+            }
+        }
+
+        async function loadInventory() {
+            try {
+                const res = await fetch('/api/security/inventory');
+                allDevices = await res.json();
+                renderInventory(allDevices);
+            } catch (e) {
+                console.error('Error loading inventory:', e);
+            }
+        }
+
+        function renderInventory(devices) {
+            const table = document.getElementById('inventory-table');
+            const empty = document.getElementById('inventory-empty');
+            const count = document.getElementById('device-count');
+
+            count.innerText = devices.length;
+
+            if (devices.length === 0) {
+                table.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+            const isAdmin = currentUser && currentUser.role === 'admin';
+
+            table.innerHTML = devices.map(d => `
+                <tr class="hover:bg-slate-800/30 transition ${!d.is_authorized ? 'bg-red-500/5' : ''}">
+                    <td class="px-5 py-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full ${d.status === 'up' ? 'bg-green-500' : 'bg-slate-500'}"></span>
+                            <span class="text-xs text-slate-400">${d.status === 'up' ? 'Online' : 'Offline'}</span>
+                        </div>
+                    </td>
+                    <td class="px-5 py-4">
+                        <div class="tooltip">
+                            <span class="font-medium text-white">${d.hostname}</span>
+                            <div class="tooltip-content">
+                                <p class="text-slate-400">First seen: ${d.first_seen}</p>
+                                <p class="text-slate-400">Last seen: ${d.last_seen}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-5 py-4 font-mono text-blue-400">${d.ip_address}</td>
+                    <td class="px-5 py-4">
+                        <div class="tooltip">
+                            <span class="font-mono text-slate-400 text-xs">${d.mac_address || '-'}</span>
+                            <div class="tooltip-content">
+                                <p class="text-white font-medium">Device Info</p>
+                                <p class="text-slate-400">MAC: ${d.mac_address || 'Unknown'}</p>
+                                <p class="text-slate-400">Vendor: ${d.vendor}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-5 py-4 text-slate-400">${d.vendor}</td>
+                    <td class="px-5 py-4 text-center">
+                        ${d.open_ports && d.open_ports.length > 0 ?
+                    d.open_ports.map(p => `<span class="inline-block px-2 py-0.5 text-xs rounded bg-slate-800 text-slate-300 mr-1 mb-1">${p}</span>`).join('') :
+                    '<span class="text-slate-500 text-xs">-</span>'}
+                    </td>
+                    <td class="px-5 py-4 text-center">
+                        ${d.is_authorized ?
+                    '<span class="px-2 py-1 text-xs rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Trusted</span>' :
+                    '<span class="px-2 py-1 text-xs rounded bg-red-500/20 text-red-400 border border-red-500/30 font-medium">Untrusted</span>'}
+                    </td>
+                    <td class="px-5 py-4 text-right">
+                        ${!d.is_authorized && isAdmin ?
+                    `<button onclick="authorizeDevice('${d.ip_address}')" class="px-3 py-1 text-xs rounded bg-slate-700 hover:bg-emerald-600 transition">Trust</button>` :
+                    (d.is_authorized ? '<i class="fas fa-check-circle text-emerald-500"></i>' : '')}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterInventory() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allDevices.filter(d =>
+                d.ip_address.toLowerCase().includes(query) ||
+                d.hostname.toLowerCase().includes(query) ||
+                (d.mac_address && d.mac_address.toLowerCase().includes(query)) ||
+                d.vendor.toLowerCase().includes(query)
+            );
+            renderInventory(filtered);
+        }
+
+        async function authorizeDevice(ip) {
+            try {
+                const res = await fetch(`/api/security/authorize/${ip}`, { method: 'POST' });
+                if (res.ok) {
+                    showToast(`Device ${ip} authorized successfully`, 'success');
+                    await loadInventory();
+                    await loadStats();
+                } else {
+                    showToast('Failed to authorize device', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function triggerScan() {
+            const btn = document.getElementById('scan-btn');
+            const icon = document.getElementById('scan-icon');
+            const text = document.getElementById('scan-text');
+
+            btn.disabled = true;
+            icon.classList.add('scanning');
+            text.innerText = 'Scanning...';
+
+            showToast('Network scan initiated...', 'info');
+
+            // Simulate scan delay
+            await new Promise(r => setTimeout(r, 2000));
+
+            await Promise.all([loadStats(), loadInventory(), loadEvents()]);
+
+            btn.disabled = false;
+            icon.classList.remove('scanning');
+            text.innerText = 'Scan Network';
+
+            showToast('Network scan complete', 'success');
+        }
+
+        function initTrafficChart() {
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            const labels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+
+            // Generate sample data
+            const inbound = labels.map(() => Math.floor(Math.random() * 400) + 100);
+            const outbound = labels.map(() => Math.floor(Math.random() * 500) + 150);
+
+            trafficChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Inbound',
+                            data: inbound,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Outbound',
+                            data: outbound,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { color: '#94a3b8', usePointStyle: true } },
+                        tooltip: {
+                            backgroundColor: '#1f2937',
+                            titleColor: '#fff',
+                            bodyColor: '#94a3b8',
+                            borderColor: '#374151',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                            ticks: { color: '#64748b', font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                            ticks: { color: '#64748b', callback: v => v + 'MB' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function scrollToInventory() {
+            document.getElementById('inventory').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function scrollToEvents() {
+            document.getElementById('events').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Add device form
+        document.getElementById('add-device-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const ip = document.getElementById('new-ip').value;
+            const hostname = document.getElementById('new-hostname').value || 'Unknown';
+            const mac = document.getElementById('new-mac').value;
+            const vendor = document.getElementById('new-vendor').value || 'Unknown';
+            const ports = document.getElementById('new-ports').value;
+
+            try {
+                const res = await fetch('/api/security/add-device', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip_address: ip, hostname, mac_address: mac, vendor, open_ports: ports })
+                });
+
+                if (res.ok) {
+                    showToast(`Device ${ip} added successfully`, 'success');
+                    document.getElementById('add-device-form').reset();
+                    await loadInventory();
+                    await loadStats();
+                } else {
+                    const data = await res.json();
+                    showToast(data.error || 'Failed to add device', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            }
+        });
+    </script>
+</body>
+
+</html>
