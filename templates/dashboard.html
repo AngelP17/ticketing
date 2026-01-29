@@ -158,7 +158,7 @@
             <div class="flex justify-between items-center">
                 <div>
                     <h2 class="text-xl font-semibold text-white" id="page-title">Dashboard Overview</h2>
-                    <p class="text-sm text-neutral-500" id="page-subtitle">Real-time metrics from Excel data source</p>
+                    <p class="text-sm text-neutral-500" id="page-subtitle"></p>
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2 text-xs">
@@ -186,7 +186,7 @@
             <div id="view-dashboard" class="view-section">
                 <!-- KPI Row -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="card kpi-glow rounded-xl p-6 transition-all duration-300">
+                    <div onclick="kpiClick('all')" class="card kpi-glow rounded-xl p-6 transition-all duration-300 cursor-pointer hover:scale-[1.02]">
                         <div class="flex justify-between items-start">
                             <div>
                                 <p class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Total Tickets</p>
@@ -197,7 +197,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card rounded-xl p-6 transition-all duration-300">
+                    <div onclick="kpiClick('open')" class="card rounded-xl p-6 transition-all duration-300 cursor-pointer hover:scale-[1.02]">
                         <div class="flex justify-between items-start">
                             <div>
                                 <p class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Open Tickets</p>
@@ -208,7 +208,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card rounded-xl p-6 transition-all duration-300">
+                    <div onclick="kpiClick('closed')" class="card rounded-xl p-6 transition-all duration-300 cursor-pointer hover:scale-[1.02]">
                         <div class="flex justify-between items-start">
                             <div>
                                 <p class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Closed / Resolved
@@ -220,7 +220,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card rounded-xl p-6 transition-all duration-300">
+                    <div onclick="kpiClick('critical')" class="card rounded-xl p-6 transition-all duration-300 cursor-pointer hover:scale-[1.02]">
                         <div class="flex justify-between items-start">
                             <div>
                                 <p class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Critical Open</p>
@@ -917,6 +917,33 @@
             renderAllTickets(filtered);
         }
 
+        function kpiClick(type) {
+            switchView('tickets');
+            const statusFilter = document.getElementById('status-filter');
+            const priorityFilter = document.getElementById('priority-filter');
+            // Reset filters first
+            statusFilter.value = '';
+            priorityFilter.value = '';
+            document.getElementById('ticket-search').value = '';
+
+            if (type === 'open') {
+                // Show tickets that are not Closed and not Resolved
+                const filtered = allTickets.filter(t => t.status !== 'Closed' && t.status !== 'Resolved');
+                renderAllTickets(filtered);
+            } else if (type === 'closed') {
+                // Show Closed and Resolved tickets
+                const filtered = allTickets.filter(t => t.status === 'Closed' || t.status === 'Resolved');
+                renderAllTickets(filtered);
+            } else if (type === 'critical') {
+                priorityFilter.value = 'Critical';
+                const filtered = allTickets.filter(t => t.priority === 'Critical' && t.status !== 'Closed' && t.status !== 'Resolved');
+                renderAllTickets(filtered);
+            } else {
+                // 'all' - show everything
+                renderAllTickets(allTickets);
+            }
+        }
+
         function renderTeam(workload) {
             const tbody = document.getElementById('team-table');
             if (!workload) return;
@@ -934,7 +961,7 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById('nav-' + name).classList.add('active');
             const titles = {
-                dashboard: ['Dashboard Overview', 'Real-time metrics from Excel'],
+                dashboard: ['Dashboard Overview', ''],
                 tickets: ['All Tickets', 'Click any row for full details'],
                 legend: ['Color Legend', 'Status and priority color explanations'],
                 team: ['Team Workload', 'Staff assignment distribution'],
