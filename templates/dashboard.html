@@ -7,6 +7,7 @@
     <title>IT Operations Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -90,6 +91,82 @@
         .ticket-row:hover {
             background: rgba(255, 255, 255, 0.05) !important;
         }
+
+        /* Kanban Board */
+        .kanban-column {
+            min-height: 200px;
+            background: rgba(15, 15, 15, 0.6);
+            border: 1px solid rgba(50, 50, 50, 0.4);
+            border-radius: 12px;
+        }
+
+        .kanban-card {
+            background: rgba(25, 25, 25, 0.9);
+            border: 1px solid rgba(60, 60, 60, 0.5);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+
+        .kanban-card:hover {
+            border-color: rgba(100, 100, 100, 0.7);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .kanban-card.sortable-ghost {
+            opacity: 0.4;
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .kanban-card.sortable-chosen {
+            cursor: grabbing;
+        }
+
+        .label-chip {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .label-select-chip {
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.15s;
+            padding: 3px 10px;
+        }
+
+        .label-select-chip.selected {
+            border-color: currentColor;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
+        }
+
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .attachment-preview {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid rgba(60,60,60,0.5);
+            cursor: pointer;
+        }
+
+        .attachment-preview:hover {
+            border-color: rgba(100,100,100,0.7);
+            transform: scale(1.05);
+        }
     </style>
 </head>
 
@@ -116,6 +193,10 @@
             <button onclick="switchView('tickets')" id="nav-tickets"
                 class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
                 <i class="fas fa-ticket-alt w-5 text-neutral-500"></i> <span>All Tickets</span>
+            </button>
+            <button onclick="switchView('board')" id="nav-board"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
+                <i class="fas fa-columns w-5 text-neutral-500"></i> <span>Board</span>
             </button>
             <button onclick="switchView('legend')" id="nav-legend"
                 class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm">
@@ -301,6 +382,10 @@
                                 <option value="Medium">Medium</option>
                                 <option value="Low">Low</option>
                             </select>
+                            <select id="type-filter" onchange="filterTickets()"
+                                class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2.5 text-sm">
+                                <option value="">All Types</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -314,6 +399,8 @@
                                     <th class="py-3 px-4 text-left">Title</th>
                                     <th class="py-3 px-4 text-center">Status</th>
                                     <th class="py-3 px-4 text-center">Priority</th>
+                                    <th class="py-3 px-4 text-left">Type</th>
+                                    <th class="py-3 px-4 text-left">Labels</th>
                                     <th class="py-3 px-4 text-left">Assigned</th>
                                     <th class="py-3 px-4 text-left">Date</th>
                                     <th class="py-3 px-4 text-center">Days</th>
@@ -324,6 +411,58 @@
                     </div>
                     <div class="border-t border-neutral-800 p-4 flex justify-between text-xs text-neutral-500">
                         <span>Showing <span id="ticket-count">0</span> tickets • Click any row for details</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: KANBAN BOARD -->
+            <div id="view-board" class="view-section hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <!-- TO DO Column -->
+                    <div class="kanban-column p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded bg-red-500"></span>
+                                <h3 class="text-sm font-semibold text-white uppercase tracking-wider">To Do</h3>
+                            </div>
+                            <span class="text-xs text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full" id="count-todo">0</span>
+                        </div>
+                        <div id="kanban-todo" class="space-y-3 min-h-[100px]" data-column="TO DO"></div>
+                    </div>
+                    <!-- IN PROGRESS Column -->
+                    <div class="kanban-column p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded bg-blue-500"></span>
+                                <h3 class="text-sm font-semibold text-white uppercase tracking-wider">In Progress</h3>
+                            </div>
+                            <span class="text-xs text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full" id="count-inprogress">0</span>
+                        </div>
+                        <div id="kanban-inprogress" class="space-y-3 min-h-[100px]" data-column="IN PROGRESS"></div>
+                    </div>
+                    <!-- IN REVIEW Column -->
+                    <div class="kanban-column p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded bg-amber-500"></span>
+                                <h3 class="text-sm font-semibold text-white uppercase tracking-wider">In Review</h3>
+                            </div>
+                            <span class="text-xs text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full" id="count-inreview">0</span>
+                        </div>
+                        <div id="kanban-inreview" class="space-y-3 min-h-[100px]" data-column="IN REVIEW"></div>
+                    </div>
+                    <!-- DONE Column -->
+                    <div class="kanban-column p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center">
+                                    <i class="fas fa-check text-white" style="font-size:6px"></i>
+                                </span>
+                                <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Done</h3>
+                            </div>
+                            <span class="text-xs text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full" id="count-done">0</span>
+                        </div>
+                        <div id="kanban-done" class="space-y-3 min-h-[100px]" data-column="DONE"></div>
                     </div>
                 </div>
             </div>
@@ -499,7 +638,8 @@
 
             <!-- VIEW: SETTINGS -->
             <div id="view-settings" class="view-section hidden">
-                <div class="max-w-md">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Change Password -->
                     <div class="card rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
                             <i class="fas fa-key text-amber-400"></i> Change Password
@@ -526,6 +666,46 @@
                             </button>
                         </form>
                         <div id="change-password-msg" class="mt-4 hidden"></div>
+                    </div>
+
+                    <!-- Category Management (admin-only) -->
+                    <div class="admin-only card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                            <i class="fas fa-folder text-blue-400"></i> Manage Categories
+                        </h3>
+                        <div class="space-y-2 max-h-64 overflow-y-auto mb-4" id="category-list"></div>
+                        <div class="border-t border-neutral-800 pt-4">
+                            <div class="flex gap-2">
+                                <input type="text" id="new-category-name" placeholder="New category name..."
+                                    class="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm">
+                                <input type="color" id="new-category-color" value="#6366f1"
+                                    class="w-10 h-10 rounded cursor-pointer bg-transparent border-0">
+                                <button onclick="createCategory()"
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Label Management (admin-only) -->
+                    <div class="admin-only card rounded-xl p-6 lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                            <i class="fas fa-tags text-amber-400"></i> Manage Labels
+                        </h3>
+                        <div class="flex flex-wrap gap-3 mb-4" id="label-list"></div>
+                        <div class="border-t border-neutral-800 pt-4">
+                            <div class="flex gap-2 items-center">
+                                <input type="text" id="new-label-name" placeholder="New label name..."
+                                    class="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm max-w-xs">
+                                <input type="color" id="new-label-color" value="#3b82f6"
+                                    class="w-10 h-10 rounded cursor-pointer bg-transparent border-0">
+                                <button onclick="createLabel()"
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -582,6 +762,10 @@
                         <p class="text-xs text-neutral-500 uppercase">Days Open</p>
                         <p id="modal-days" class="text-white"></p>
                     </div>
+                    <div class="col-span-2">
+                        <p class="text-xs text-neutral-500 uppercase mb-1">Labels</p>
+                        <div id="modal-labels" class="flex flex-wrap gap-1"></div>
+                    </div>
                 </div>
                 <div class="mb-6">
                     <p class="text-xs text-neutral-500 uppercase mb-2">Description</p>
@@ -590,6 +774,10 @@
                 <div class="mb-6">
                     <p class="text-xs text-neutral-500 uppercase mb-2">Resolution Notes</p>
                     <div class="bg-neutral-950 p-4 rounded-lg text-neutral-300 text-sm" id="modal-resolution">-</div>
+                </div>
+                <div class="mb-6">
+                    <p class="text-xs text-neutral-500 uppercase mb-2">Attachments</p>
+                    <div id="modal-attachments" class="flex flex-wrap gap-3"></div>
                 </div>
             </div>
             <!-- Actions -->
@@ -614,13 +802,13 @@
                     class="w-8 h-8 rounded hover:bg-red-600 flex items-center justify-center text-neutral-400 hover:text-white"><i
                         class="fas fa-times"></i></button>
             </div>
-            <form id="ticket-form" class="p-6 space-y-4">
+            <form id="ticket-form" class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 <input type="hidden" id="form-ticket-id">
                 <div>
-                    <label class="block text-xs text-neutral-500 uppercase mb-1">Title</label>
+                    <label class="block text-xs text-neutral-500 uppercase mb-1">Title <span class="text-red-500">*</span></label>
                     <input type="text" id="form-title"
                         class="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500"
-                        required>
+                        required placeholder="e.g., Server memory leak in production">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -649,8 +837,23 @@
                     <div>
                         <label class="block text-xs text-neutral-500 uppercase mb-1">Request Type</label>
                         <select id="form-type"
-                            class="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-white">
+                            class="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-white"
+                            onchange="onRequestTypeChange(this)">
                         </select>
+                        <div id="custom-type-container" class="hidden mt-2">
+                            <div class="flex gap-2">
+                                <input type="text" id="custom-type-input" placeholder="New category name..."
+                                    class="flex-1 bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-1.5 text-white text-sm">
+                                <button type="button" onclick="addCustomCategory()"
+                                    class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                <button type="button" onclick="cancelCustomCategory()"
+                                    class="px-3 py-1.5 bg-neutral-700 text-white rounded-lg text-sm hover:bg-neutral-600">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs text-neutral-500 uppercase mb-1">Assigned To</label>
@@ -664,9 +867,24 @@
                         class="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-white">
                 </div>
                 <div>
+                    <label class="block text-xs text-neutral-500 uppercase mb-1">Labels</label>
+                    <div id="form-labels" class="flex flex-wrap gap-2 p-3 bg-neutral-950 border border-neutral-700 rounded-lg min-h-[40px]">
+                    </div>
+                </div>
+                <div>
                     <label class="block text-xs text-neutral-500 uppercase mb-1">Description</label>
                     <textarea id="form-description" rows="3"
-                        class="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-white"></textarea>
+                        class="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-white"
+                        placeholder="Add details, steps to reproduce, expected behavior..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs text-neutral-500 uppercase mb-1">Attachments</label>
+                    <div id="form-attachments-preview" class="flex flex-wrap gap-3 mb-2"></div>
+                    <label class="flex items-center gap-2 px-4 py-2 bg-neutral-950 border border-neutral-700 border-dashed rounded-lg cursor-pointer hover:border-neutral-500 transition text-sm text-neutral-400">
+                        <i class="fas fa-paperclip"></i> Attach files (images, PDF, max 5MB)
+                        <input type="file" id="form-file-input" class="hidden" accept="image/*,.pdf,.txt"
+                            multiple onchange="handleFileSelect(this)">
+                    </label>
                 </div>
                 <div>
                     <label class="block text-xs text-neutral-500 uppercase mb-1">Resolution Notes</label>
@@ -690,6 +908,7 @@
         let countdown = 30;
         let currentTicket = null;
         let currentUser = null;
+        let pendingFiles = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             await loadUserInfo();
@@ -702,7 +921,6 @@
                 const res = await fetch('/api/me');
                 if (res.ok) {
                     currentUser = await res.json();
-                    // Update sidebar user display
                     const initials = currentUser.display_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
                     document.getElementById('user-avatar').innerText = initials;
                     document.getElementById('user-display-name').innerText = currentUser.display_name;
@@ -711,14 +929,11 @@
                 } else {
                     window.location.href = '/login';
                 }
-            } catch (e) {
-                console.error('Error loading user:', e);
-            }
+            } catch (e) { console.error('Error loading user:', e); }
         }
 
         function applyRoleBasedUI() {
             const isAdmin = currentUser && currentUser.role === 'admin';
-            // Hide/show admin-only elements
             document.querySelectorAll('.admin-only').forEach(el => {
                 el.style.display = isAdmin ? '' : 'none';
             });
@@ -728,9 +943,7 @@
             try {
                 await fetch('/api/logout', { method: 'POST' });
                 window.location.href = '/login';
-            } catch (e) {
-                console.error('Logout error:', e);
-            }
+            } catch (e) { console.error('Logout error:', e); }
         }
 
         async function loadData() {
@@ -746,6 +959,16 @@
                 renderRecentTickets(allTickets.slice(0, 8));
                 renderAllTickets(allTickets);
                 renderTeam(statsData.staff_workload);
+                // Populate type filter
+                await loadDropdownOptions();
+                const typeFilter = document.getElementById('type-filter');
+                if (typeFilter) {
+                    const currentVal = typeFilter.value;
+                    typeFilter.innerHTML = '<option value="">All Types</option>' +
+                        dropdownOptions.request_types.map(t =>
+                            `<option value="${t}" ${t === currentVal ? 'selected' : ''}>${t}</option>`
+                        ).join('');
+                }
             } catch (e) { console.error("Error:", e); }
             icon.classList.remove('fa-spin');
         }
@@ -774,39 +997,15 @@
                     datasets: [{
                         data: Object.values(data),
                         backgroundColor: colors,
-                        borderWidth: 2,
-                        borderColor: '#0a0a0a',
-                        hoverBorderColor: '#0a0a0a',
-                        hoverBorderWidth: 3,
-                        hoverOffset: 6
+                        borderWidth: 2, borderColor: '#0a0a0a',
+                        hoverBorderColor: '#0a0a0a', hoverBorderWidth: 3, hoverOffset: 6
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
+                    responsive: true, maintainAspectRatio: false, cutout: '70%',
                     plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                color: '#a3a3a3',
-                                font: { size: 11 },
-                                usePointStyle: true,
-                                pointStyleWidth: 8,
-                                padding: 16
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: '#171717',
-                            titleColor: '#ffffff',
-                            bodyColor: '#d4d4d4',
-                            borderColor: '#404040',
-                            borderWidth: 1,
-                            cornerRadius: 8,
-                            padding: 12,
-                            displayColors: true,
-                            boxPadding: 4
-                        }
+                        legend: { position: 'right', labels: { color: '#a3a3a3', font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8, padding: 16 } },
+                        tooltip: { backgroundColor: '#171717', titleColor: '#ffffff', bodyColor: '#d4d4d4', borderColor: '#404040', borderWidth: 1, cornerRadius: 8, padding: 12, displayColors: true, boxPadding: 4 }
                     }
                 }
             });
@@ -821,41 +1020,14 @@
                 type: 'bar',
                 data: {
                     labels: sorted.map(x => x[0]),
-                    datasets: [{
-                        data: sorted.map(x => x[1]),
-                        backgroundColor: '#6366f1',
-                        hoverBackgroundColor: '#818cf8',
-                        borderRadius: 6,
-                        borderSkipped: false
-                    }]
+                    datasets: [{ data: sorted.map(x => x[1]), backgroundColor: '#6366f1', hoverBackgroundColor: '#818cf8', borderRadius: 6, borderSkipped: false }]
                 },
                 options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#171717',
-                            titleColor: '#ffffff',
-                            bodyColor: '#d4d4d4',
-                            borderColor: '#404040',
-                            borderWidth: 1,
-                            cornerRadius: 8,
-                            padding: 12
-                        }
-                    },
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#171717', titleColor: '#ffffff', bodyColor: '#d4d4d4', borderColor: '#404040', borderWidth: 1, cornerRadius: 8, padding: 12 } },
                     scales: {
-                        x: {
-                            ticks: { color: '#525252' },
-                            grid: { color: '#262626' },
-                            border: { display: false }
-                        },
-                        y: {
-                            ticks: { color: '#a3a3a3', font: { size: 10 } },
-                            grid: { display: false },
-                            border: { display: false }
-                        }
+                        x: { ticks: { color: '#525252' }, grid: { color: '#262626' }, border: { display: false } },
+                        y: { ticks: { color: '#a3a3a3', font: { size: 10 } }, grid: { display: false }, border: { display: false } }
                     }
                 }
             });
@@ -869,6 +1041,12 @@
         function getPriorityText(priority) {
             const colors = { 'Critical': 'text-red-500 font-bold', 'High': 'text-orange-400 font-semibold', 'Medium': 'text-amber-400', 'Low': 'text-green-400' };
             return `<span class="${colors[priority] || 'text-neutral-400'}">${priority}</span>`;
+        }
+
+        function renderLabelChips(labels) {
+            return (labels || []).map(l =>
+                `<span class="label-chip" style="background:${l.color}22;color:${l.color}">${l.name}</span>`
+            ).join(' ');
         }
 
         function renderRecentTickets(tickets) {
@@ -886,7 +1064,6 @@
 
         function renderAllTickets(tickets) {
             document.getElementById('all-tickets').innerHTML = tickets.map(t => {
-                // Handle '-' for closed/resolved tickets
                 let daysClass = 'text-neutral-500';
                 if (t.days_open !== '-' && typeof t.days_open === 'number') {
                     daysClass = t.days_open > 7 ? 'text-red-400 font-bold' : t.days_open > 4 ? 'text-amber-400' : 'text-neutral-500';
@@ -897,6 +1074,8 @@
                         <td class="py-3 px-4 text-white max-w-sm truncate">${t.title}</td>
                         <td class="py-3 px-4 text-center">${getStatusBadge(t.status)}</td>
                         <td class="py-3 px-4 text-center text-xs">${getPriorityText(t.priority)}</td>
+                        <td class="py-3 px-4 text-neutral-400 text-xs">${t.request_type || '-'}</td>
+                        <td class="py-3 px-4">${renderLabelChips(t.labels)}</td>
                         <td class="py-3 px-4 text-neutral-400">${t.staff_assigned || '-'}</td>
                         <td class="py-3 px-4 text-neutral-500 text-xs">${t.date_opened}</td>
                         <td class="py-3 px-4 text-center text-xs ${daysClass}">${t.days_open}</td>
@@ -910,9 +1089,10 @@
             const search = document.getElementById('ticket-search').value.toLowerCase();
             const status = document.getElementById('status-filter').value;
             const priority = document.getElementById('priority-filter').value;
+            const type = document.getElementById('type-filter').value;
             const filtered = allTickets.filter(t => {
                 const matchSearch = t.ticket_id.toLowerCase().includes(search) || t.title.toLowerCase().includes(search) || (t.staff_assigned || '').toLowerCase().includes(search);
-                return matchSearch && (!status || t.status === status) && (!priority || t.priority === priority);
+                return matchSearch && (!status || t.status === status) && (!priority || t.priority === priority) && (!type || t.request_type === type);
             });
             renderAllTickets(filtered);
         }
@@ -921,17 +1101,16 @@
             switchView('tickets');
             const statusFilter = document.getElementById('status-filter');
             const priorityFilter = document.getElementById('priority-filter');
-            // Reset filters first
+            const typeFilter = document.getElementById('type-filter');
             statusFilter.value = '';
             priorityFilter.value = '';
+            typeFilter.value = '';
             document.getElementById('ticket-search').value = '';
 
             if (type === 'open') {
-                // Show tickets that are not Closed and not Resolved
                 const filtered = allTickets.filter(t => t.status !== 'Closed' && t.status !== 'Resolved');
                 renderAllTickets(filtered);
             } else if (type === 'closed') {
-                // Show Closed and Resolved tickets
                 const filtered = allTickets.filter(t => t.status === 'Closed' || t.status === 'Resolved');
                 renderAllTickets(filtered);
             } else if (type === 'critical') {
@@ -939,7 +1118,6 @@
                 const filtered = allTickets.filter(t => t.priority === 'Critical' && t.status !== 'Closed' && t.status !== 'Resolved');
                 renderAllTickets(filtered);
             } else {
-                // 'all' - show everything
                 renderAllTickets(allTickets);
             }
         }
@@ -963,20 +1141,105 @@
             const titles = {
                 dashboard: ['Dashboard Overview', ''],
                 tickets: ['All Tickets', 'Click any row for full details'],
+                board: ['Kanban Board', 'Drag tickets between columns to update status'],
                 legend: ['Color Legend', 'Status and priority color explanations'],
                 team: ['Team Workload', 'Staff assignment distribution'],
                 users: ['User Management', 'Create and manage user accounts'],
-                settings: ['Settings', 'Account preferences']
+                settings: ['Settings', 'Account preferences and system configuration']
             };
             document.getElementById('page-title').innerText = titles[name][0];
             document.getElementById('page-subtitle').innerText = titles[name][1];
 
-            // Load users when switching to users view
             if (name === 'users') loadUsers();
+            if (name === 'board') loadKanbanBoard();
+            if (name === 'settings') { loadCategoryList(); loadLabelList(); }
+        }
+
+        // --- KANBAN BOARD ---
+        async function loadKanbanBoard() {
+            try {
+                const res = await fetch('/api/kanban');
+                const columns = await res.json();
+                renderKanbanColumn('kanban-todo', columns['TO DO'] || [], 'count-todo');
+                renderKanbanColumn('kanban-inprogress', columns['IN PROGRESS'] || [], 'count-inprogress');
+                renderKanbanColumn('kanban-inreview', columns['IN REVIEW'] || [], 'count-inreview');
+                renderKanbanColumn('kanban-done', columns['DONE'] || [], 'count-done');
+                initKanbanDragDrop();
+            } catch (e) { console.error('Error loading kanban:', e); }
+        }
+
+        function renderKanbanColumn(containerId, tickets, countId) {
+            const container = document.getElementById(containerId);
+            document.getElementById(countId).innerText = tickets.length;
+            const priorityBorders = { 'Critical': 'border-l-red-500', 'High': 'border-l-orange-500', 'Medium': 'border-l-amber-500', 'Low': 'border-l-green-500' };
+
+            container.innerHTML = tickets.map(t => {
+                const borderClass = priorityBorders[t.priority] || 'border-l-neutral-500';
+                const labelsHtml = (t.labels || []).map(l =>
+                    `<span class="label-chip" style="background:${l.color}22;color:${l.color}">${l.name}</span>`
+                ).join('');
+                const assigneeInitials = t.staff_assigned ?
+                    t.staff_assigned.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : '';
+
+                return `
+                    <div class="kanban-card border-l-4 ${borderClass}" data-ticket-id="${t.ticket_id}" onclick="openTicketModal('${t.ticket_id}')">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-mono text-xs text-blue-400">${t.ticket_id}</span>
+                            ${getPriorityText(t.priority)}
+                        </div>
+                        <p class="text-sm text-white font-medium mb-2 line-clamp-2">${t.title}</p>
+                        ${labelsHtml ? `<div class="flex flex-wrap gap-1 mb-2">${labelsHtml}</div>` : ''}
+                        <div class="flex items-center justify-between mt-2 pt-2 border-t border-neutral-800">
+                            <span class="text-xs text-neutral-500">${t.request_type || ''}</span>
+                            ${t.staff_assigned ? `
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-[8px] font-bold">${assigneeInitials}</div>
+                                    <span class="text-xs text-neutral-400">${t.staff_assigned.split(' ')[0]}</span>
+                                </div>
+                            ` : '<span class="text-xs text-neutral-600">Unassigned</span>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function initKanbanDragDrop() {
+            const isAdmin = currentUser && currentUser.role === 'admin';
+            ['kanban-todo', 'kanban-inprogress', 'kanban-inreview', 'kanban-done'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el._sortable) el._sortable.destroy();
+                el._sortable = new Sortable(el, {
+                    group: 'kanban',
+                    animation: 200,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    disabled: !isAdmin,
+                    onEnd: async function(evt) {
+                        const ticketId = evt.item.dataset.ticketId;
+                        const targetColumn = evt.to.dataset.column;
+                        try {
+                            const res = await fetch(`/api/tickets/${ticketId}/move`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ column: targetColumn })
+                            });
+                            if (!res.ok) { loadKanbanBoard(); }
+                            else { updateKanbanCounts(); loadData(); }
+                        } catch (e) { console.error('Move failed:', e); loadKanbanBoard(); }
+                    }
+                });
+            });
+        }
+
+        function updateKanbanCounts() {
+            ['todo', 'inprogress', 'inreview', 'done'].forEach(col => {
+                const container = document.getElementById(`kanban-${col}`);
+                document.getElementById(`count-${col}`).innerText = container.querySelectorAll('.kanban-card').length;
+            });
         }
 
         // --- MODAL FUNCTIONS ---
-        function openTicketModal(ticketId) {
+        async function openTicketModal(ticketId) {
             currentTicket = allTickets.find(t => t.ticket_id === ticketId);
             if (!currentTicket) return;
             document.getElementById('modal-ticket-id').innerText = currentTicket.ticket_id;
@@ -990,7 +1253,37 @@
             document.getElementById('modal-days').innerText = currentTicket.days_open || '0';
             document.getElementById('modal-description').innerText = currentTicket.description || 'No description provided.';
             document.getElementById('modal-resolution').innerText = currentTicket.resolution_notes || 'No resolution notes yet.';
+            // Labels
+            document.getElementById('modal-labels').innerHTML = renderLabelChips(currentTicket.labels) || '<span class="text-neutral-500 text-xs">None</span>';
+            // Attachments
+            await loadModalAttachments(currentTicket.ticket_id);
             document.getElementById('ticket-modal').classList.remove('hidden');
+        }
+
+        async function loadModalAttachments(ticketId) {
+            const container = document.getElementById('modal-attachments');
+            try {
+                const res = await fetch(`/api/tickets/${ticketId}/attachments`);
+                const attachments = await res.json();
+                if (attachments.length === 0) {
+                    container.innerHTML = '<span class="text-neutral-500 text-xs">No attachments</span>';
+                    return;
+                }
+                container.innerHTML = attachments.map(a => {
+                    if (a.mime_type.startsWith('image/')) {
+                        return `<a href="/api/attachments/${a.id}" target="_blank" title="${a.original_name}">
+                            <img src="/api/attachments/${a.id}" class="attachment-preview" alt="${a.original_name}">
+                        </a>`;
+                    }
+                    return `<a href="/api/attachments/${a.id}" target="_blank"
+                        class="flex items-center gap-2 px-3 py-2 bg-neutral-950 rounded-lg border border-neutral-700 hover:border-neutral-500 text-sm text-neutral-300">
+                        <i class="fas fa-file text-neutral-400"></i> ${a.original_name}
+                        <span class="text-neutral-500 text-xs">${(a.file_size / 1024).toFixed(0)}KB</span>
+                    </a>`;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<span class="text-neutral-500 text-xs">Error loading attachments</span>';
+            }
         }
 
         function closeModal() { document.getElementById('ticket-modal').classList.add('hidden'); currentTicket = null; }
@@ -998,7 +1291,7 @@
         function maximizeModal() { document.querySelector('#ticket-modal .modal-window').classList.toggle('max-w-2xl'); document.querySelector('#ticket-modal .modal-window').classList.toggle('max-w-5xl'); }
 
         // --- CRUD FUNCTIONS ---
-        let dropdownOptions = { request_types: [], staff: [], requesters: [] };
+        let dropdownOptions = { request_types: [], categories: [], labels: [], staff: [], requesters: [] };
 
         async function loadDropdownOptions() {
             try {
@@ -1010,12 +1303,118 @@
         function populateRequestTypeDropdown(selectedType = '') {
             const typeSelect = document.getElementById('form-type');
             typeSelect.innerHTML = '<option value="">Select...</option>' +
-                dropdownOptions.request_types.map(t => `<option value="${t}" ${t === selectedType ? 'selected' : ''}>${t}</option>`).join('');
+                dropdownOptions.request_types.map(t =>
+                    `<option value="${t}" ${t === selectedType ? 'selected' : ''}>${t}</option>`
+                ).join('') +
+                '<option value="__custom__">+ Add Custom Category...</option>';
+        }
+
+        function onRequestTypeChange(select) {
+            if (select.value === '__custom__') {
+                document.getElementById('custom-type-container').classList.remove('hidden');
+                select.value = '';
+            }
+        }
+
+        async function addCustomCategory() {
+            const name = document.getElementById('custom-type-input').value.trim();
+            if (!name) return;
+            try {
+                const res = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    await loadDropdownOptions();
+                    populateRequestTypeDropdown(name);
+                    document.getElementById('form-type').value = name;
+                    cancelCustomCategory();
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Error creating category');
+                }
+            } catch (e) { alert('Network error'); }
+        }
+
+        function cancelCustomCategory() {
+            document.getElementById('custom-type-container').classList.add('hidden');
+            document.getElementById('custom-type-input').value = '';
+        }
+
+        function populateLabelsSelector(selectedLabelIds = []) {
+            const container = document.getElementById('form-labels');
+            if (!container) return;
+            container.innerHTML = (dropdownOptions.labels || []).map(l => {
+                const isSelected = selectedLabelIds.includes(l.id);
+                return `<span class="label-select-chip label-chip ${isSelected ? 'selected' : ''}"
+                    style="background:${l.color}22;color:${l.color};border-color:${isSelected ? l.color : 'transparent'}"
+                    data-label-id="${l.id}" onclick="toggleLabel(this,'${l.color}')">${l.name}</span>`;
+            }).join('');
+            if ((dropdownOptions.labels || []).length === 0) {
+                container.innerHTML = '<span class="text-neutral-500 text-xs">No labels available. Create labels in Settings.</span>';
+            }
+        }
+
+        function toggleLabel(el, color) {
+            el.classList.toggle('selected');
+            el.style.borderColor = el.classList.contains('selected') ? color : 'transparent';
+        }
+
+        function getSelectedLabelIds() {
+            return Array.from(document.querySelectorAll('#form-labels .label-select-chip.selected'))
+                .map(el => parseInt(el.dataset.labelId));
+        }
+
+        // File handling
+        function handleFileSelect(input) {
+            const preview = document.getElementById('form-attachments-preview');
+            for (const file of input.files) {
+                if (file.size > 5 * 1024 * 1024) { alert(`File "${file.name}" exceeds 5MB limit`); continue; }
+                pendingFiles.push(file);
+                const div = document.createElement('div');
+                div.className = 'relative';
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.className = 'attachment-preview';
+                    img.src = URL.createObjectURL(file);
+                    img.title = file.name;
+                    div.appendChild(img);
+                } else {
+                    div.innerHTML = `<div class="flex items-center gap-2 px-3 py-2 bg-neutral-950 rounded-lg border border-neutral-700 text-xs text-neutral-300">
+                        <i class="fas fa-file"></i> ${file.name}
+                    </div>`;
+                }
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500';
+                removeBtn.innerHTML = '<i class="fas fa-times" style="font-size:8px"></i>';
+                removeBtn.type = 'button';
+                const idx = pendingFiles.length - 1;
+                removeBtn.onclick = () => { pendingFiles[idx] = null; div.remove(); };
+                div.appendChild(removeBtn);
+                preview.appendChild(div);
+            }
+            input.value = '';
+        }
+
+        async function uploadPendingFiles(ticketId) {
+            const filesToUpload = pendingFiles.filter(f => f !== null);
+            for (const file of filesToUpload) {
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    await fetch(`/api/tickets/${ticketId}/attachments`, { method: 'POST', body: formData });
+                } catch (e) { console.error('Upload error:', e); }
+            }
+            pendingFiles = [];
         }
 
         async function openNewTicketModal() {
             await loadDropdownOptions();
             populateRequestTypeDropdown();
+            populateLabelsSelector([]);
+            pendingFiles = [];
+            document.getElementById('form-attachments-preview').innerHTML = '';
             document.getElementById('edit-modal-title').innerText = 'New Ticket';
             document.getElementById('form-ticket-id').value = '';
             document.getElementById('form-title').value = '';
@@ -1026,16 +1425,48 @@
             document.getElementById('form-requester').value = '';
             document.getElementById('form-description').value = '';
             document.getElementById('form-resolution').value = '';
+            cancelCustomCategory();
             document.getElementById('edit-modal').classList.remove('hidden');
         }
 
         async function editCurrentTicket() {
             if (!currentTicket) return;
-            // Save ticket data before closing modal (which nullifies currentTicket)
             const ticket = { ...currentTicket };
             closeModal();
             await loadDropdownOptions();
             populateRequestTypeDropdown(ticket.request_type);
+            populateLabelsSelector((ticket.labels || []).map(l => l.id));
+            pendingFiles = [];
+            document.getElementById('form-attachments-preview').innerHTML = '';
+            // Load existing attachments for preview
+            try {
+                const res = await fetch(`/api/tickets/${ticket.ticket_id}/attachments`);
+                const attachments = await res.json();
+                const preview = document.getElementById('form-attachments-preview');
+                attachments.forEach(a => {
+                    const div = document.createElement('div');
+                    div.className = 'relative';
+                    if (a.mime_type.startsWith('image/')) {
+                        div.innerHTML = `<img src="/api/attachments/${a.id}" class="attachment-preview" title="${a.original_name}">`;
+                    } else {
+                        div.innerHTML = `<div class="flex items-center gap-2 px-3 py-2 bg-neutral-950 rounded-lg border border-neutral-700 text-xs text-neutral-300">
+                            <i class="fas fa-file"></i> ${a.original_name}</div>`;
+                    }
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'admin-only absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-500';
+                    removeBtn.innerHTML = '<i class="fas fa-times" style="font-size:8px"></i>';
+                    removeBtn.type = 'button';
+                    removeBtn.onclick = async () => {
+                        if (confirm('Delete this attachment?')) {
+                            await fetch(`/api/attachments/${a.id}`, { method: 'DELETE' });
+                            div.remove();
+                        }
+                    };
+                    div.appendChild(removeBtn);
+                    preview.appendChild(div);
+                });
+            } catch (e) { console.error('Error loading attachments:', e); }
+
             document.getElementById('edit-modal-title').innerText = 'Edit ' + ticket.ticket_id;
             document.getElementById('form-ticket-id').value = ticket.ticket_id;
             document.getElementById('form-title').value = ticket.title;
@@ -1045,13 +1476,15 @@
             document.getElementById('form-requester').value = ticket.requester || '';
             document.getElementById('form-description').value = ticket.description || '';
             document.getElementById('form-resolution').value = ticket.resolution_notes || '';
+            cancelCustomCategory();
             document.getElementById('edit-modal').classList.remove('hidden');
         }
 
-        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); pendingFiles = []; }
 
         async function saveTicket() {
             const ticketId = document.getElementById('form-ticket-id').value;
+            const labelIds = getSelectedLabelIds();
             const data = {
                 title: document.getElementById('form-title').value,
                 status: document.getElementById('form-status').value,
@@ -1060,13 +1493,32 @@
                 staff_assigned: document.getElementById('form-assigned').value,
                 requester: document.getElementById('form-requester').value,
                 description: document.getElementById('form-description').value,
-                resolution_notes: document.getElementById('form-resolution').value
+                resolution_notes: document.getElementById('form-resolution').value,
+                label_ids: labelIds
             };
+            if (!data.title.trim()) { alert('Title is required'); return; }
             try {
                 const url = ticketId ? `/api/tickets/${ticketId}` : '/api/tickets';
                 const method = ticketId ? 'PUT' : 'POST';
                 const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-                if (res.ok) { closeEditModal(); loadData(); } else { alert('Error saving ticket'); }
+                if (res.ok) {
+                    const result = await res.json();
+                    const savedTicketId = ticketId || result.ticket_id;
+                    // Update labels for existing tickets
+                    if (ticketId) {
+                        await fetch(`/api/tickets/${ticketId}/labels`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ label_ids: labelIds })
+                        });
+                    }
+                    // Upload pending files
+                    if (pendingFiles.filter(f => f !== null).length > 0) {
+                        await uploadPendingFiles(savedTicketId);
+                    }
+                    closeEditModal();
+                    loadData();
+                } else { alert('Error saving ticket'); }
             } catch (e) { alert('Network error'); }
         }
 
@@ -1078,16 +1530,107 @@
             } catch (e) { alert('Network error'); }
         }
 
+        // --- CATEGORY MANAGEMENT ---
+        async function loadCategoryList() {
+            try {
+                const res = await fetch('/api/categories');
+                const categories = await res.json();
+                document.getElementById('category-list').innerHTML = categories.map(c => `
+                    <div class="flex items-center gap-3 p-2 bg-neutral-900/50 rounded-lg">
+                        <span class="w-4 h-4 rounded flex-shrink-0" style="background:${c.color}"></span>
+                        <i class="fas ${c.icon} text-neutral-400 text-xs w-4 flex-shrink-0"></i>
+                        <span class="text-sm text-white flex-1">${c.name}</span>
+                        ${c.is_custom ? `<button onclick="deleteCategory(${c.id})" class="text-red-400 hover:text-red-300 text-xs"><i class="fas fa-trash"></i></button>` :
+                        '<span class="text-xs text-neutral-600">Default</span>'}
+                    </div>
+                `).join('');
+            } catch (e) { console.error('Error loading categories:', e); }
+        }
+
+        async function createCategory() {
+            const name = document.getElementById('new-category-name').value.trim();
+            const color = document.getElementById('new-category-color').value;
+            if (!name) { alert('Category name is required'); return; }
+            try {
+                const res = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, color })
+                });
+                if (res.ok) {
+                    document.getElementById('new-category-name').value = '';
+                    loadCategoryList();
+                    loadDropdownOptions();
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Error creating category');
+                }
+            } catch (e) { alert('Network error'); }
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('Deactivate this category? Existing tickets will keep their type.')) return;
+            try {
+                await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+                loadCategoryList();
+                loadDropdownOptions();
+            } catch (e) { alert('Network error'); }
+        }
+
+        // --- LABEL MANAGEMENT ---
+        async function loadLabelList() {
+            try {
+                const res = await fetch('/api/labels');
+                const labels = await res.json();
+                document.getElementById('label-list').innerHTML = labels.map(l => `
+                    <div class="flex items-center gap-2 p-2 bg-neutral-900/50 rounded-lg">
+                        <span class="label-chip" style="background:${l.color}22;color:${l.color}">${l.name}</span>
+                        <button onclick="deleteLabel(${l.id})" class="text-red-400 hover:text-red-300 text-xs ml-1"><i class="fas fa-times"></i></button>
+                    </div>
+                `).join('');
+                if (labels.length === 0) {
+                    document.getElementById('label-list').innerHTML = '<span class="text-neutral-500 text-sm">No labels yet. Create one below.</span>';
+                }
+            } catch (e) { console.error('Error loading labels:', e); }
+        }
+
+        async function createLabel() {
+            const name = document.getElementById('new-label-name').value.trim().toUpperCase();
+            const color = document.getElementById('new-label-color').value;
+            if (!name) { alert('Label name is required'); return; }
+            try {
+                const res = await fetch('/api/labels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, color })
+                });
+                if (res.ok) {
+                    document.getElementById('new-label-name').value = '';
+                    loadLabelList();
+                    loadDropdownOptions();
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Error creating label');
+                }
+            } catch (e) { alert('Network error'); }
+        }
+
+        async function deleteLabel(id) {
+            if (!confirm('Delete this label? It will be removed from all tickets.')) return;
+            try {
+                await fetch(`/api/labels/${id}`, { method: 'DELETE' });
+                loadLabelList();
+                loadDropdownOptions();
+            } catch (e) { alert('Network error'); }
+        }
+
         // --- USER MANAGEMENT ---
         let allUsers = [];
 
         async function loadUsers() {
             try {
                 const res = await fetch('/api/users');
-                if (res.ok) {
-                    allUsers = await res.json();
-                    renderUsers();
-                }
+                if (res.ok) { allUsers = await res.json(); renderUsers(); }
             } catch (e) { console.error('Error loading users:', e); }
         }
 
@@ -1157,14 +1700,12 @@
             const msgEl = document.getElementById('change-password-msg');
             const newPass = document.getElementById('new-password-change').value;
             const confirmPass = document.getElementById('confirm-password').value;
-
             if (newPass !== confirmPass) {
                 msgEl.className = 'mt-4 p-3 rounded bg-red-500/20 text-red-400 text-sm';
                 msgEl.textContent = 'Passwords do not match';
                 msgEl.classList.remove('hidden');
                 return;
             }
-
             try {
                 const res = await fetch('/api/change-password', {
                     method: 'POST',

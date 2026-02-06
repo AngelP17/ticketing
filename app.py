@@ -6,6 +6,8 @@ from functools import wraps
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, send_file
 from datetime import datetime, time
 from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from io import BytesIO
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -110,8 +112,144 @@ def init_database():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # Categories table (managed request types)
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                color VARCHAR(7) DEFAULT '#6366f1',
+                icon VARCHAR(50) DEFAULT 'fa-tag',
+                is_custom BOOLEAN DEFAULT FALSE,
+                is_active BOOLEAN DEFAULT TRUE,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Labels table (colored tags like Jira)
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS labels (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(50) UNIQUE NOT NULL,
+                color VARCHAR(7) DEFAULT '#3b82f6',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Ticket-Labels junction table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS ticket_labels (
+                ticket_id VARCHAR(20) REFERENCES tickets(ticket_id) ON DELETE CASCADE,
+                label_id INTEGER REFERENCES labels(id) ON DELETE CASCADE,
+                PRIMARY KEY (ticket_id, label_id)
+            )
+        ''')
+
+        # Ticket attachments table (images)
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS ticket_attachments (
+                id SERIAL PRIMARY KEY,
+                ticket_id VARCHAR(20) REFERENCES tickets(ticket_id) ON DELETE CASCADE,
+                filename VARCHAR(255) NOT NULL,
+                original_name VARCHAR(255) NOT NULL,
+                mime_type VARCHAR(100) NOT NULL,
+                file_data BYTEA NOT NULL,
+                file_size INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Add category_id column to tickets if not exists
+        cur.execute('''
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id)
+        ''')
+
         conn.commit()
-        print("[DB] Database initialized successfully")
+        print("[DB] Database tables initialized successfully")
+
+        # Seed default categories
+        default_categories = [
+            ('Account Changes', '#3b82f6', 'fa-user-cog'),
+            ('Account Setup', '#10b981', 'fa-user-plus'),
+            ('Company Website Issues', '#f59e0b', 'fa-globe'),
+            ('Documentation Request', '#8b5cf6', 'fa-file-alt'),
+            ('Email Issues', '#ef4444', 'fa-envelope'),
+            ('Feedback Request', '#ec4899', 'fa-comment'),
+            ('Hardware Acquisition', '#6366f1', 'fa-shopping-cart'),
+            ('Hardware Setup', '#818cf8', 'fa-desktop'),
+            ('Network Problems', '#14b8a6', 'fa-wifi'),
+            ('Permission Changes', '#f97316', 'fa-shield-alt'),
+            ('Server Issues', '#dc2626', 'fa-server'),
+            ('Software Acquisition', '#0ea5e9', 'fa-download'),
+            ('Software Issues', '#38bdf8', 'fa-bug'),
+            ('Software Setup', '#7dd3fc', 'fa-cog'),
+            ('Spam Removal', '#84cc16', 'fa-trash'),
+            ('System Access', '#a855f7', 'fa-lock'),
+            ('Password Reset', '#06b6d4', 'fa-key'),
+            ('Printer Issue', '#fb923c', 'fa-print'),
+            ('VPN/Remote Access', '#4f46e5', 'fa-network-wired'),
+            ('Security Incident', '#e11d48', 'fa-exclamation-triangle'),
+            ('Database Support', '#a78bfa', 'fa-database'),
+            ('Server Maintenance', '#d946ef', 'fa-tools'),
+            ('Backup/Recovery', '#f472b6', 'fa-cloud-upload-alt'),
+            ('Phone/VoIP', '#fb7185', 'fa-phone'),
+            ('New Employee Setup', '#64748b', 'fa-user-plus'),
+            ('Offboarding', '#475569', 'fa-user-minus'),
+            ('General Inquiry', '#737373', 'fa-question-circle'),
+            ('Change Request', '#a3a3a3', 'fa-exchange-alt'),
+            ('Application Error', '#fb923c', 'fa-bug'),
+        ]
+        for name, color, icon in default_categories:
+            cur.execute('''
+                INSERT INTO categories (name, color, icon, is_custom)
+                VALUES (%s, %s, %s, FALSE)
+                ON CONFLICT (name) DO NOTHING
+            ''', (name, color, icon))
+
+        # Seed default labels
+        default_labels = [
+            ('BILLING', '#ef4444'),
+            ('ACCOUNTS', '#3b82f6'),
+            ('FORMS', '#22c55e'),
+            ('FEEDBACK', '#f59e0b'),
+            ('URGENT', '#dc2626'),
+            ('FOLLOW-UP', '#8b5cf6'),
+            ('ESCALATED', '#f97316'),
+            ('SLA-BREACH', '#e11d48'),
+        ]
+        for name, color in default_labels:
+            cur.execute('''
+                INSERT INTO labels (name, color)
+                VALUES (%s, %s)
+                ON CONFLICT (name) DO NOTHING
+            ''', (name, color))
+
+        conn.commit()
+        print("[DB] Default categories and labels seeded")
+
+        # Migrate existing request_type values to categories
+        cur.execute('''
+            INSERT INTO categories (name, is_custom, is_active)
+            SELECT DISTINCT request_type, FALSE, TRUE
+            FROM tickets
+            WHERE request_type IS NOT NULL
+              AND request_type != ''
+              AND request_type != 'nan'
+            ON CONFLICT (name) DO NOTHING
+        ''')
+
+        # Link existing tickets to their categories
+        cur.execute('''
+            UPDATE tickets
+            SET category_id = c.id
+            FROM categories c
+            WHERE tickets.request_type = c.name
+              AND tickets.category_id IS NULL
+        ''')
+
+        conn.commit()
+        print("[DB] Existing data migrated to categories")
 
         # Check if we need to migrate data from Excel
         cur.execute("SELECT COUNT(*) as count FROM tickets")
@@ -259,7 +397,7 @@ def admin_required(f):
 
 # --- DATABASE TICKET FUNCTIONS ---
 def read_tickets_from_db():
-    """Read all tickets from the database."""
+    """Read all tickets from the database with category and label data."""
     conn = get_db_connection()
     if not conn:
         return []
@@ -267,21 +405,39 @@ def read_tickets_from_db():
     try:
         cur = conn.cursor()
         cur.execute('''
-            SELECT ticket_id, title, status, priority, request_type,
-                   staff_assigned, requester, date_opened, description, resolution_notes
-            FROM tickets
-            ORDER BY date_opened DESC, id DESC
+            SELECT t.ticket_id, t.title, t.status, t.priority, t.request_type,
+                   t.staff_assigned, t.requester, t.date_opened, t.description,
+                   t.resolution_notes, t.category_id,
+                   c.name as category_name, c.color as category_color
+            FROM tickets t
+            LEFT JOIN categories c ON t.category_id = c.id
+            ORDER BY t.date_opened DESC, t.id DESC
         ''')
         rows = cur.fetchall()
+
+        # Fetch all ticket-label associations in one query
+        cur.execute('''
+            SELECT tl.ticket_id, l.id as label_id, l.name, l.color
+            FROM ticket_labels tl
+            JOIN labels l ON tl.label_id = l.id
+        ''')
+        label_rows = cur.fetchall()
         cur.close()
         conn.close()
+
+        # Build label lookup
+        ticket_labels = {}
+        for lr in label_rows:
+            tid = lr['ticket_id']
+            if tid not in ticket_labels:
+                ticket_labels[tid] = []
+            ticket_labels[tid].append({'id': lr['label_id'], 'name': lr['name'], 'color': lr['color']})
 
         tickets = []
         for row in rows:
             date_opened = row['date_opened']
             if date_opened:
                 date_str = date_opened.strftime('%Y-%m-%d') if hasattr(date_opened, 'strftime') else str(date_opened)
-                # Calculate days open
                 if row['status'] in ['Closed', 'Resolved']:
                     days_open = -1
                 else:
@@ -297,13 +453,16 @@ def read_tickets_from_db():
                 'title': row['title'] or '',
                 'status': row['status'] or 'Open',
                 'priority': row['priority'] or 'Low',
-                'request_type': row['request_type'] or '',
+                'request_type': row.get('category_name') or row['request_type'] or '',
                 'staff_assigned': row['staff_assigned'] or '',
                 'requester': row['requester'] or '',
                 'date_opened': date_str,
                 'days_open': days_open,
                 'description': row['description'] or '',
-                'resolution_notes': row['resolution_notes'] or ''
+                'resolution_notes': row['resolution_notes'] or '',
+                'category_id': row.get('category_id'),
+                'category_color': row.get('category_color', '#6366f1'),
+                'labels': ticket_labels.get(row['ticket_id'], [])
             })
 
         return tickets
@@ -336,7 +495,7 @@ def get_next_ticket_id():
         return 'IT-20250001'
 
 def create_ticket_in_db(ticket_data):
-    """Create a new ticket in the database."""
+    """Create a new ticket in the database with category and label support."""
     conn = get_db_connection()
     if not conn:
         return None
@@ -345,25 +504,43 @@ def create_ticket_in_db(ticket_data):
         cur = conn.cursor()
         ticket_id = get_next_ticket_id()
 
+        # Resolve category_id from request_type name if not provided
+        category_id = ticket_data.get('category_id')
+        request_type = ticket_data.get('request_type', '')
+        if not category_id and request_type:
+            cur.execute('SELECT id FROM categories WHERE name = %s', (request_type,))
+            cat = cur.fetchone()
+            if cat:
+                category_id = cat['id']
+
         cur.execute('''
             INSERT INTO tickets (ticket_id, title, status, priority, request_type,
-                                staff_assigned, requester, date_opened, description, resolution_notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                staff_assigned, requester, date_opened, description,
+                                resolution_notes, category_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING ticket_id
         ''', (
             ticket_id,
             ticket_data.get('title', ''),
             ticket_data.get('status', 'Open'),
             ticket_data.get('priority', 'Low'),
-            ticket_data.get('request_type', ''),
+            request_type,
             ticket_data.get('staff_assigned', ''),
             ticket_data.get('requester', ''),
             datetime.now().date(),
             ticket_data.get('description', ''),
-            ticket_data.get('resolution_notes', '')
+            ticket_data.get('resolution_notes', ''),
+            category_id
         ))
 
         result = cur.fetchone()
+
+        # Handle labels
+        label_ids = ticket_data.get('label_ids', [])
+        for lid in label_ids:
+            cur.execute('INSERT INTO ticket_labels (ticket_id, label_id) VALUES (%s, %s) ON CONFLICT DO NOTHING',
+                        (ticket_id, int(lid)))
+
         conn.commit()
         cur.close()
         conn.close()
@@ -492,58 +669,200 @@ def calculate_stats(tickets):
     }
 
 def get_dropdown_options():
-    """Get unique values for dropdown fields."""
+    """Get unique values for dropdown fields from categories table and ticket data."""
+    conn = get_db_connection()
+    categories = []
+    labels = []
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute('SELECT id, name, color, icon FROM categories WHERE is_active = TRUE ORDER BY sort_order, name')
+            categories = [dict(c) for c in cur.fetchall()]
+            cur.execute('SELECT id, name, color FROM labels ORDER BY name')
+            labels = [dict(l) for l in cur.fetchall()]
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f"[DB] ERROR in get_dropdown_options: {e}")
+
     tickets = read_tickets_from_db()
     return {
-        'request_types': sorted(set(t['request_type'] for t in tickets if t['request_type'] and t['request_type'] != 'nan')),
+        'request_types': [c['name'] for c in categories],
+        'categories': categories,
+        'labels': labels,
         'staff': sorted(set(t['staff_assigned'] for t in tickets if t['staff_assigned'] and t['staff_assigned'] != 'nan')),
         'requesters': sorted(set(t['requester'] for t in tickets if t['requester'] and t['requester'] != 'nan'))
     }
 
 # --- EXCEL EXPORT FUNCTION ---
 def generate_excel_from_db():
-    """Generate an Excel file from database tickets."""
+    """Generate a professionally styled Excel file from database tickets."""
     tickets = read_tickets_from_db()
 
     wb = Workbook()
+
+    # --- Sheet 1: Ticket Data ---
     ws = wb.active
     ws.title = "IT Service Tickets"
 
-    # Header row
     headers = ['Ticket ID', 'Title', 'Status', 'Priority', 'Request Type',
-               'Staff Assigned', 'Requester', 'Date Opened', 'Days Open',
+               'Labels', 'Staff Assigned', 'Requester', 'Date Opened', 'Days Open',
                'Description', 'Resolution Notes']
-    ws.append(headers)
+
+    # Header styling
+    header_fill = PatternFill(start_color='1a1a1a', end_color='1a1a1a', fill_type='solid')
+    header_font = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+    header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin', color='404040'),
+        right=Side(style='thin', color='404040'),
+        top=Side(style='thin', color='404040'),
+        bottom=Side(style='thin', color='404040')
+    )
+
+    # Write and style headers
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+        cell.border = thin_border
+
+    # Priority cell fills
+    priority_fills = {
+        'Critical': PatternFill(start_color='fecaca', end_color='fecaca', fill_type='solid'),
+        'High': PatternFill(start_color='fed7aa', end_color='fed7aa', fill_type='solid'),
+        'Medium': PatternFill(start_color='fef3c7', end_color='fef3c7', fill_type='solid'),
+        'Low': PatternFill(start_color='dcfce7', end_color='dcfce7', fill_type='solid'),
+    }
+    priority_fonts = {
+        'Critical': Font(color='991B1B', bold=True),
+        'High': Font(color='9A3412'),
+        'Medium': Font(color='92400E'),
+        'Low': Font(color='166534'),
+    }
+
+    # Status cell fills
+    status_fills = {
+        'Open': PatternFill(start_color='fecaca', end_color='fecaca', fill_type='solid'),
+        'In Progress': PatternFill(start_color='dbeafe', end_color='dbeafe', fill_type='solid'),
+        'Waiting for Info': PatternFill(start_color='fef3c7', end_color='fef3c7', fill_type='solid'),
+        'Resolved': PatternFill(start_color='ccfbf1', end_color='ccfbf1', fill_type='solid'),
+        'Closed': PatternFill(start_color='dcfce7', end_color='dcfce7', fill_type='solid'),
+    }
 
     # Data rows
-    for t in tickets:
+    for row_idx, t in enumerate(tickets, 2):
+        labels_str = ', '.join(l['name'] for l in t.get('labels', []))
         days_open = t['days_open'] if t['days_open'] != -1 else '-'
-        ws.append([
-            t['ticket_id'],
-            t['title'],
-            t['status'],
-            t['priority'],
-            t['request_type'],
-            t['staff_assigned'],
-            t['requester'],
-            t['date_opened'],
-            days_open,
-            t['description'],
-            t['resolution_notes']
-        ])
+        data_row = [
+            t['ticket_id'], t['title'], t['status'], t['priority'],
+            t['request_type'], labels_str, t['staff_assigned'], t['requester'],
+            t['date_opened'], days_open, t['description'], t['resolution_notes']
+        ]
+        for col_idx, value in enumerate(data_row, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = thin_border
+
+        # Apply priority color (column 4)
+        priority_cell = ws.cell(row=row_idx, column=4)
+        if t['priority'] in priority_fills:
+            priority_cell.fill = priority_fills[t['priority']]
+            priority_cell.font = priority_fonts.get(t['priority'], Font())
+
+        # Apply status color (column 3)
+        status_cell = ws.cell(row=row_idx, column=3)
+        if t['status'] in status_fills:
+            status_cell.fill = status_fills[t['status']]
+
+    # Auto-filter
+    if len(tickets) > 0:
+        ws.auto_filter.ref = ws.dimensions
+
+    # Freeze top row
+    ws.freeze_panes = 'A2'
 
     # Auto-adjust column widths
     for col in ws.columns:
         max_length = 0
-        column = col[0].column_letter
+        column_letter = get_column_letter(col[0].column)
         for cell in col:
             try:
-                if len(str(cell.value)) > max_length:
+                if cell.value and len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except:
                 pass
-        adjusted_width = min(max_length + 2, 50)
-        ws.column_dimensions[column].width = adjusted_width
+        ws.column_dimensions[column_letter].width = min(max_length + 3, 50)
+
+    # --- Sheet 2: Summary ---
+    ws2 = wb.create_sheet("Summary")
+    stats = calculate_stats(tickets)
+
+    title_font = Font(bold=True, size=14, color='1a1a1a')
+    section_font = Font(bold=True, size=12, color='333333')
+    meta_font = Font(color='666666', size=10)
+
+    ws2.cell(row=1, column=1, value="IT Service Tickets - Summary Report").font = title_font
+    ws2.cell(row=2, column=1, value=f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}").font = meta_font
+    ws2.cell(row=3, column=1, value=f"Total Tickets: {stats['total']}").font = Font(bold=True, size=11)
+
+    # Status breakdown
+    row = 5
+    ws2.cell(row=row, column=1, value="Status Breakdown").font = section_font
+    ws2.cell(row=row, column=1).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    ws2.cell(row=row, column=2).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    row += 1
+    for status, count in sorted(stats['statuses'].items(), key=lambda x: x[1], reverse=True):
+        ws2.cell(row=row, column=1, value=status)
+        ws2.cell(row=row, column=2, value=count)
+        if status in status_fills:
+            ws2.cell(row=row, column=1).fill = status_fills[status]
+        row += 1
+
+    # Priority breakdown
+    row += 1
+    ws2.cell(row=row, column=1, value="Priority Breakdown").font = section_font
+    ws2.cell(row=row, column=1).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    ws2.cell(row=row, column=2).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    row += 1
+    for priority, count in sorted(stats['priorities'].items(), key=lambda x: x[1], reverse=True):
+        ws2.cell(row=row, column=1, value=priority)
+        ws2.cell(row=row, column=2, value=count)
+        if priority in priority_fills:
+            ws2.cell(row=row, column=1).fill = priority_fills[priority]
+        row += 1
+
+    # Request types
+    row += 1
+    ws2.cell(row=row, column=1, value="Request Types").font = section_font
+    ws2.cell(row=row, column=1).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    ws2.cell(row=row, column=2).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    row += 1
+    for rt, count in sorted(stats['request_types'].items(), key=lambda x: x[1], reverse=True):
+        ws2.cell(row=row, column=1, value=rt)
+        ws2.cell(row=row, column=2, value=count)
+        row += 1
+
+    # Staff workload
+    row += 1
+    ws2.cell(row=row, column=1, value="Staff Workload").font = section_font
+    ws2.cell(row=row, column=1).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    ws2.cell(row=row, column=2).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    ws2.cell(row=row, column=3).fill = PatternFill(start_color='f3f4f6', end_color='f3f4f6', fill_type='solid')
+    row += 1
+    ws2.cell(row=row, column=1, value="Staff Member").font = Font(bold=True)
+    ws2.cell(row=row, column=2, value="Assigned").font = Font(bold=True)
+    ws2.cell(row=row, column=3, value="Open").font = Font(bold=True)
+    row += 1
+    for staff, data in sorted(stats['staff_workload'].items()):
+        ws2.cell(row=row, column=1, value=staff)
+        ws2.cell(row=row, column=2, value=data['assigned'])
+        ws2.cell(row=row, column=3, value=data['open'])
+        row += 1
+
+    ws2.column_dimensions['A'].width = 30
+    ws2.column_dimensions['B'].width = 12
+    ws2.column_dimensions['C'].width = 12
 
     return wb
 
@@ -666,6 +985,331 @@ def api_change_password():
             save_users(users)
             return jsonify({'status': 'success'})
     return jsonify({'error': 'User not found'}), 404
+
+# --- CATEGORY CRUD ---
+@app.route('/api/categories')
+@login_required
+def api_categories():
+    conn = get_db_connection()
+    if not conn:
+        return jsonify([])
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT id, name, color, icon, is_custom, is_active FROM categories WHERE is_active = TRUE ORDER BY sort_order, name')
+        categories = [dict(c) for c in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return jsonify(categories)
+    except Exception as e:
+        print(f"[API] Error fetching categories: {e}")
+        return jsonify([])
+
+@app.route('/api/categories', methods=['POST'])
+@admin_required
+def api_create_category():
+    data = request.json
+    name = data.get('name', '').strip()
+    color = data.get('color', '#6366f1')
+    icon = data.get('icon', 'fa-tag')
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('''INSERT INTO categories (name, color, icon, is_custom)
+                       VALUES (%s, %s, %s, TRUE) RETURNING id, name, color, icon''',
+                    (name, color, icon))
+        cat = dict(cur.fetchone())
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify(cat), 201
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+            return jsonify({'error': 'Category already exists'}), 409
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories/<int:cat_id>', methods=['PUT'])
+@admin_required
+def api_update_category(cat_id):
+    data = request.json
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        updates, values = [], []
+        for field in ['name', 'color', 'icon', 'is_active']:
+            if field in data:
+                updates.append(f"{field} = %s")
+                values.append(data[field])
+        if not updates:
+            cur.close()
+            conn.close()
+            return jsonify({'status': 'no changes'}), 200
+        values.append(cat_id)
+        cur.execute(f"UPDATE categories SET {', '.join(updates)} WHERE id = %s", values)
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories/<int:cat_id>', methods=['DELETE'])
+@admin_required
+def api_delete_category(cat_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE categories SET is_active = FALSE WHERE id = %s', (cat_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+# --- LABEL CRUD ---
+@app.route('/api/labels')
+@login_required
+def api_labels():
+    conn = get_db_connection()
+    if not conn:
+        return jsonify([])
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT id, name, color FROM labels ORDER BY name')
+        labels = [dict(l) for l in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return jsonify(labels)
+    except Exception as e:
+        print(f"[API] Error fetching labels: {e}")
+        return jsonify([])
+
+@app.route('/api/labels', methods=['POST'])
+@admin_required
+def api_create_label():
+    data = request.json
+    name = data.get('name', '').strip().upper()
+    color = data.get('color', '#3b82f6')
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('INSERT INTO labels (name, color) VALUES (%s, %s) RETURNING id, name, color',
+                    (name, color))
+        label = dict(cur.fetchone())
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify(label), 201
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+            return jsonify({'error': 'Label already exists'}), 409
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/labels/<int:label_id>', methods=['DELETE'])
+@admin_required
+def api_delete_label(label_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM labels WHERE id = %s', (label_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+# --- TICKET LABELS ---
+@app.route('/api/tickets/<ticket_id>/labels', methods=['PUT'])
+@admin_required
+def api_set_ticket_labels(ticket_id):
+    data = request.json
+    label_ids = data.get('label_ids', [])
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM ticket_labels WHERE ticket_id = %s', (ticket_id,))
+        for lid in label_ids:
+            cur.execute('INSERT INTO ticket_labels (ticket_id, label_id) VALUES (%s, %s) ON CONFLICT DO NOTHING',
+                        (ticket_id, int(lid)))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+# --- KANBAN BOARD ---
+@app.route('/api/kanban')
+@login_required
+def api_kanban():
+    tickets = read_tickets_from_db()
+    columns = {
+        'TO DO': [],
+        'IN PROGRESS': [],
+        'IN REVIEW': [],
+        'DONE': []
+    }
+    status_map = {
+        'Open': 'TO DO',
+        'In Progress': 'IN PROGRESS',
+        'Waiting for Info': 'IN REVIEW',
+        'Resolved': 'DONE',
+        'Closed': 'DONE'
+    }
+    for t in tickets:
+        if t['days_open'] == -1:
+            t['days_open'] = '-'
+        col = status_map.get(t['status'], 'TO DO')
+        columns[col].append(t)
+    return jsonify(columns)
+
+@app.route('/api/tickets/<ticket_id>/move', methods=['PUT'])
+@admin_required
+def api_move_ticket(ticket_id):
+    data = request.json
+    target_column = data.get('column', '')
+    column_to_status = {
+        'TO DO': 'Open',
+        'IN PROGRESS': 'In Progress',
+        'IN REVIEW': 'Waiting for Info',
+        'DONE': 'Resolved'
+    }
+    new_status = column_to_status.get(target_column)
+    if not new_status:
+        return jsonify({'error': 'Invalid column'}), 400
+    if update_ticket_in_db(ticket_id, {'status': new_status}):
+        return jsonify({'status': 'success', 'new_status': new_status})
+    return jsonify({'error': 'Ticket not found'}), 404
+
+# --- TICKET ATTACHMENTS ---
+@app.route('/api/tickets/<ticket_id>/attachments', methods=['POST'])
+@admin_required
+def api_upload_attachment(ticket_id):
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    # Validate file type
+    allowed_types = {'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
+                     'application/pdf', 'text/plain'}
+    if file.content_type not in allowed_types:
+        return jsonify({'error': 'File type not allowed. Accepted: images, PDF, text'}), 400
+    # Limit file size (5MB)
+    file_data = file.read()
+    if len(file_data) > 5 * 1024 * 1024:
+        return jsonify({'error': 'File too large (max 5MB)'}), 400
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        import uuid
+        filename = f"{uuid.uuid4().hex}_{file.filename}"
+        cur.execute('''INSERT INTO ticket_attachments (ticket_id, filename, original_name, mime_type, file_data, file_size)
+                       VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, filename, original_name, mime_type, file_size''',
+                    (ticket_id, filename, file.filename, file.content_type, psycopg2.Binary(file_data), len(file_data)))
+        attachment = dict(cur.fetchone())
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify(attachment), 201
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tickets/<ticket_id>/attachments')
+@login_required
+def api_get_attachments(ticket_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify([])
+    try:
+        cur = conn.cursor()
+        cur.execute('''SELECT id, filename, original_name, mime_type, file_size, created_at
+                       FROM ticket_attachments WHERE ticket_id = %s ORDER BY created_at''', (ticket_id,))
+        attachments = []
+        for row in cur.fetchall():
+            att = dict(row)
+            att['created_at'] = att['created_at'].isoformat() if att['created_at'] else ''
+            attachments.append(att)
+        cur.close()
+        conn.close()
+        return jsonify(attachments)
+    except Exception as e:
+        print(f"[API] Error fetching attachments: {e}")
+        return jsonify([])
+
+@app.route('/api/attachments/<int:attachment_id>')
+@login_required
+def api_serve_attachment(attachment_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT filename, original_name, mime_type, file_data FROM ticket_attachments WHERE id = %s',
+                    (attachment_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            return jsonify({'error': 'Attachment not found'}), 404
+        return send_file(
+            BytesIO(bytes(row['file_data'])),
+            mimetype=row['mime_type'],
+            download_name=row['original_name']
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/attachments/<int:attachment_id>', methods=['DELETE'])
+@admin_required
+def api_delete_attachment(attachment_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database error'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM ticket_attachments WHERE id = %s', (attachment_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/')
 def index():
