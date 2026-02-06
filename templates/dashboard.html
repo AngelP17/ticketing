@@ -1066,6 +1066,7 @@
             }
         };
         Chart.register(centerTextPlugin);
+        Chart.defaults.color = '#e5e5e5';
 
         // Shared tooltip config
         const tooltipStyle = {
@@ -1123,7 +1124,6 @@
                                     return chart.data.labels.map((label, i) => ({
                                         text: `${label}  ${ds.data[i]}`,
                                         fillStyle: ds.backgroundColor[i],
-                                        fontColor: '#e5e5e5',
                                         strokeStyle: 'transparent',
                                         hidden: false, index: i
                                     }));
