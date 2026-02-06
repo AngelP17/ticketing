@@ -314,19 +314,38 @@
                     </div>
                 </div>
 
-                <!-- Charts Row -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <!-- Charts Row 1 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <div class="card rounded-xl p-6">
-                        <h3 class="text-sm font-semibold text-white mb-4">Ticket Status</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-semibold text-white tracking-wide">Ticket Status</h3>
+                            <span class="text-xs text-neutral-500">Distribution</span>
+                        </div>
                         <div class="h-56"><canvas id="statusChart"></canvas></div>
                     </div>
                     <div class="card rounded-xl p-6">
-                        <h3 class="text-sm font-semibold text-white mb-4">Priority Levels</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-semibold text-white tracking-wide">Priority Levels</h3>
+                            <span class="text-xs text-neutral-500">Breakdown</span>
+                        </div>
                         <div class="h-56"><canvas id="priorityChart"></canvas></div>
                     </div>
+                </div>
+                <!-- Charts Row 2 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div class="card rounded-xl p-6">
-                        <h3 class="text-sm font-semibold text-white mb-4">Request Types</h3>
-                        <div class="h-56"><canvas id="requestTypeChart"></canvas></div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-semibold text-white tracking-wide">Top Request Types</h3>
+                            <span class="text-xs text-neutral-500">By Volume</span>
+                        </div>
+                        <div class="h-64"><canvas id="requestTypeChart"></canvas></div>
+                    </div>
+                    <div class="card rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-semibold text-white tracking-wide">Staff Workload</h3>
+                            <span class="text-xs text-neutral-500">Assigned vs Open</span>
+                        </div>
+                        <div class="h-64"><canvas id="workloadChart"></canvas></div>
                     </div>
                 </div>
 
@@ -470,10 +489,11 @@
             <!-- VIEW: COLOR LEGEND -->
             <div id="view-legend" class="view-section hidden">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Status Colors -->
                     <div class="card rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
                                 class="fas fa-palette text-blue-400"></i> Status Colors</h3>
-                        <div class="space-y-4">
+                        <div class="space-y-3">
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-emerald-500"></span>
                                 <span class="font-medium text-white">Closed</span>
@@ -482,8 +502,7 @@
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-teal-500"></span>
                                 <span class="font-medium text-white">Resolved</span>
-                                <span class="text-neutral-400 text-sm ml-auto">Solution provided, awaiting
-                                    confirmation</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Solution provided, awaiting confirmation</span>
                             </div>
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-blue-500"></span>
@@ -493,8 +512,7 @@
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-amber-500"></span>
                                 <span class="font-medium text-white">Waiting for Info</span>
-                                <span class="text-neutral-400 text-sm ml-auto">Pending additional information from
-                                    requester</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Pending additional information from requester</span>
                             </div>
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-red-500"></span>
@@ -503,40 +521,65 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Priority Levels -->
                     <div class="card rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
                                 class="fas fa-exclamation-triangle text-amber-400"></i> Priority Levels</h3>
-                        <div class="space-y-4">
+                        <div class="space-y-3">
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-red-500"></span>
                                 <span class="font-medium text-red-400">Critical</span>
-                                <span class="text-neutral-400 text-sm ml-auto">System-wide outages, major impact, needs
-                                    immediate action</span>
+                                <span class="text-neutral-400 text-sm ml-auto">System-wide outages, needs immediate action</span>
                             </div>
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-orange-500"></span>
                                 <span class="font-medium text-orange-400">High</span>
-                                <span class="text-neutral-400 text-sm ml-auto">Key business functions affected, resolve
-                                    within 24-48h</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Key business functions affected, 24-48h</span>
                             </div>
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-amber-500"></span>
                                 <span class="font-medium text-amber-400">Medium</span>
-                                <span class="text-neutral-400 text-sm ml-auto">Individual users affected, some
-                                    inconvenience</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Individual users affected, some inconvenience</span>
                             </div>
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-green-500"></span>
                                 <span class="font-medium text-green-400">Low</span>
-                                <span class="text-neutral-400 text-sm ml-auto">Minor issues, standard requests, no daily
-                                    impact</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Minor issues, standard requests</span>
                             </div>
                         </div>
                     </div>
-                    <div class="card rounded-xl p-6 lg:col-span-2">
+                    <!-- Kanban Board Columns -->
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
+                                class="fas fa-columns text-indigo-400"></i> Kanban Board Columns</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-red-500"></span>
+                                <span class="font-medium text-red-400">TO DO</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Tickets with "Open" status</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-blue-500"></span>
+                                <span class="font-medium text-blue-400">IN PROGRESS</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Tickets with "In Progress" status</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-amber-500"></span>
+                                <span class="font-medium text-amber-400">IN REVIEW</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Tickets with "Waiting for Info" status</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
+                                <span class="w-4 h-4 rounded bg-emerald-500"></span>
+                                <span class="font-medium text-emerald-400">DONE</span>
+                                <span class="text-neutral-400 text-sm ml-auto">Tickets with "Resolved" or "Closed" status</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Days Open Indicators -->
+                    <div class="card rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
                                 class="fas fa-clock text-red-400"></i> Days Open Indicators</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="space-y-3">
                             <div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
                                 <span class="w-4 h-4 rounded bg-red-500"></span>
                                 <span class="font-medium text-red-400">&gt; 7 Days (Alert)</span>
@@ -552,6 +595,22 @@
                                 <span class="font-medium text-neutral-300">&lt; 4 Days</span>
                                 <span class="text-neutral-400 text-sm ml-auto">Within normal SLA</span>
                             </div>
+                        </div>
+                    </div>
+                    <!-- Labels Legend (dynamically loaded) -->
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
+                                class="fas fa-tags text-purple-400"></i> Ticket Labels</h3>
+                        <div id="legend-labels-container" class="space-y-3">
+                            <div class="text-neutral-500 text-sm">Loading labels...</div>
+                        </div>
+                    </div>
+                    <!-- Categories Legend (dynamically loaded) -->
+                    <div class="card rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
+                                class="fas fa-folder-open text-teal-400"></i> Request Categories</h3>
+                        <div id="legend-categories-container" class="max-h-80 overflow-y-auto space-y-2 pr-1">
+                            <div class="text-neutral-500 text-sm">Loading categories...</div>
                         </div>
                     </div>
                 </div>
@@ -980,13 +1039,53 @@
             document.getElementById('kpi-critical').innerText = s.critical;
         }
 
+        // Center text plugin for doughnut charts
+        const centerTextPlugin = {
+            id: 'centerText',
+            afterDraw(chart) {
+                if (chart.config.type !== 'doughnut' || !chart.options.plugins.centerText) return;
+                const { ctx, chartArea: { left, right, top, bottom } } = chart;
+                const centerX = (left + right) / 2;
+                const centerY = (top + bottom) / 2;
+                const cfg = chart.options.plugins.centerText;
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = `700 ${cfg.fontSize || 28}px Inter, system-ui, sans-serif`;
+                ctx.fillStyle = cfg.color || '#ffffff';
+                ctx.fillText(cfg.text || '', centerX, centerY - 8);
+                ctx.font = `400 10px Inter, system-ui, sans-serif`;
+                ctx.fillStyle = '#737373';
+                ctx.fillText(cfg.subtext || '', centerX, centerY + 14);
+                ctx.restore();
+            }
+        };
+        Chart.register(centerTextPlugin);
+
+        // Shared tooltip config
+        const tooltipStyle = {
+            backgroundColor: 'rgba(15,15,15,0.95)', titleColor: '#f5f5f5', bodyColor: '#d4d4d4',
+            borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, cornerRadius: 6,
+            padding: { top: 10, bottom: 10, left: 14, right: 14 },
+            displayColors: true, boxPadding: 6, titleFont: { weight: '600', size: 12 },
+            bodyFont: { size: 11 }, caretSize: 5,
+            callbacks: { label: function(ctx) { const total = ctx.dataset.data.reduce((a, b) => a + b, 0); const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0; return ` ${ctx.label}: ${ctx.raw} (${pct}%)`; } }
+        };
+
         function renderCharts(s) {
-            createDoughnutChart('statusChart', s.statuses, ['#22c55e', '#14b8a6', '#3b82f6', '#f59e0b', '#ef4444']);
-            createDoughnutChart('priorityChart', s.priorities, ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6b7280']);
+            const total = Object.values(s.statuses).reduce((a, b) => a + b, 0);
+            const critCount = s.priorities['Critical'] || 0;
+            createDoughnutChart('statusChart', s.statuses,
+                ['#34d399', '#2dd4bf', '#60a5fa', '#fbbf24', '#f87171'],
+                { text: String(total), subtext: 'TOTAL' });
+            createDoughnutChart('priorityChart', s.priorities,
+                ['#f87171', '#fb923c', '#facc15', '#4ade80', '#a3a3a3'],
+                { text: String(critCount), subtext: 'CRITICAL', color: critCount > 0 ? '#f87171' : '#ffffff' });
             createHorizontalBarChart('requestTypeChart', s.request_types);
+            createWorkloadChart('workloadChart', s.staff_workload);
         }
 
-        function createDoughnutChart(id, data, colors) {
+        function createDoughnutChart(id, data, colors, centerCfg) {
             const ctx = document.getElementById(id);
             if (!ctx) return;
             if (window[id] instanceof Chart) window[id].destroy();
@@ -997,15 +1096,36 @@
                     datasets: [{
                         data: Object.values(data),
                         backgroundColor: colors,
-                        borderWidth: 2, borderColor: '#0a0a0a',
-                        hoverBorderColor: '#0a0a0a', hoverBorderWidth: 3, hoverOffset: 6
+                        borderWidth: 0,
+                        hoverBorderWidth: 0,
+                        hoverOffset: 4,
+                        spacing: 2
                     }]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false, cutout: '70%',
+                    responsive: true, maintainAspectRatio: false, cutout: '72%',
+                    layout: { padding: { left: 0, right: 0 } },
+                    animation: { animateRotate: true, duration: 800, easing: 'easeOutQuart' },
                     plugins: {
-                        legend: { position: 'right', labels: { color: '#a3a3a3', font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8, padding: 16 } },
-                        tooltip: { backgroundColor: '#171717', titleColor: '#ffffff', bodyColor: '#d4d4d4', borderColor: '#404040', borderWidth: 1, cornerRadius: 8, padding: 12, displayColors: true, boxPadding: 4 }
+                        centerText: centerCfg,
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#a3a3a3', font: { size: 11, family: 'Inter, system-ui, sans-serif' },
+                                usePointStyle: true, pointStyle: 'rectRounded', pointStyleWidth: 10, padding: 14,
+                                generateLabels: function(chart) {
+                                    const ds = chart.data.datasets[0];
+                                    const total = ds.data.reduce((a, b) => a + b, 0);
+                                    return chart.data.labels.map((label, i) => ({
+                                        text: `${label}  ${ds.data[i]}`,
+                                        fillStyle: ds.backgroundColor[i],
+                                        strokeStyle: 'transparent',
+                                        hidden: false, index: i
+                                    }));
+                                }
+                            }
+                        },
+                        tooltip: { ...tooltipStyle }
                     }
                 }
             });
@@ -1015,19 +1135,113 @@
             const ctx = document.getElementById(id);
             if (!ctx) return;
             if (window[id] instanceof Chart) window[id].destroy();
-            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const barColors = ['#818cf8','#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#fb923c','#38bdf8','#f472b6','#2dd4bf'];
             window[id] = new Chart(ctx.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: sorted.map(x => x[0]),
-                    datasets: [{ data: sorted.map(x => x[1]), backgroundColor: '#6366f1', hoverBackgroundColor: '#818cf8', borderRadius: 6, borderSkipped: false }]
+                    datasets: [{
+                        data: sorted.map(x => x[1]),
+                        backgroundColor: sorted.map((_, i) => barColors[i % barColors.length]),
+                        hoverBackgroundColor: sorted.map((_, i) => barColors[i % barColors.length] + 'cc'),
+                        borderRadius: 4,
+                        borderSkipped: false,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.85
+                    }]
                 },
                 options: {
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#171717', titleColor: '#ffffff', bodyColor: '#d4d4d4', borderColor: '#404040', borderWidth: 1, cornerRadius: 8, padding: 12 } },
+                    animation: { duration: 600, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,15,15,0.95)', titleColor: '#f5f5f5', bodyColor: '#d4d4d4',
+                            borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, cornerRadius: 6,
+                            padding: { top: 10, bottom: 10, left: 14, right: 14 }, caretSize: 5,
+                            callbacks: { label: function(ctx) { return ` ${ctx.raw} tickets`; } }
+                        }
+                    },
                     scales: {
-                        x: { ticks: { color: '#525252' }, grid: { color: '#262626' }, border: { display: false } },
-                        y: { ticks: { color: '#a3a3a3', font: { size: 10 } }, grid: { display: false }, border: { display: false } }
+                        x: {
+                            ticks: { color: '#525252', font: { size: 10 } },
+                            grid: { color: 'rgba(255,255,255,0.04)', drawTicks: false },
+                            border: { display: false }
+                        },
+                        y: {
+                            ticks: { color: '#d4d4d4', font: { size: 11, family: 'Inter, system-ui, sans-serif' }, padding: 8 },
+                            grid: { display: false },
+                            border: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createWorkloadChart(id, workload) {
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            if (window[id] instanceof Chart) window[id].destroy();
+            const staff = Object.entries(workload).sort((a, b) => b[1].assigned - a[1].assigned).slice(0, 8);
+            if (staff.length === 0) {
+                ctx.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-neutral-500 text-sm">No staff data available</div>';
+                return;
+            }
+            window[id] = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: staff.map(s => s[0]),
+                    datasets: [
+                        {
+                            label: 'Assigned',
+                            data: staff.map(s => s[1].assigned),
+                            backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                            hoverBackgroundColor: 'rgba(99, 102, 241, 0.9)',
+                            borderRadius: 4, borderSkipped: false,
+                            barPercentage: 0.6, categoryPercentage: 0.8
+                        },
+                        {
+                            label: 'Open',
+                            data: staff.map(s => s[1].open),
+                            backgroundColor: 'rgba(251, 146, 60, 0.7)',
+                            hoverBackgroundColor: 'rgba(251, 146, 60, 0.9)',
+                            borderRadius: 4, borderSkipped: false,
+                            barPercentage: 0.6, categoryPercentage: 0.8
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 600, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: {
+                            position: 'top', align: 'end',
+                            labels: {
+                                color: '#a3a3a3', font: { size: 10, family: 'Inter, system-ui, sans-serif' },
+                                usePointStyle: true, pointStyle: 'rectRounded', pointStyleWidth: 10, padding: 16, boxHeight: 8
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,15,15,0.95)', titleColor: '#f5f5f5', bodyColor: '#d4d4d4',
+                            borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, cornerRadius: 6,
+                            padding: { top: 10, bottom: 10, left: 14, right: 14 }, caretSize: 5,
+                            callbacks: { label: function(ctx) { return ` ${ctx.dataset.label}: ${ctx.raw} tickets`; } }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: false,
+                            ticks: { color: '#525252', font: { size: 10 }, stepSize: 1 },
+                            grid: { color: 'rgba(255,255,255,0.04)', drawTicks: false },
+                            border: { display: false }
+                        },
+                        y: {
+                            stacked: false,
+                            ticks: { color: '#d4d4d4', font: { size: 11, family: 'Inter, system-ui, sans-serif' }, padding: 8 },
+                            grid: { display: false },
+                            border: { display: false }
+                        }
                     }
                 }
             });
@@ -1142,7 +1356,7 @@
                 dashboard: ['Dashboard Overview', ''],
                 tickets: ['All Tickets', 'Click any row for full details'],
                 board: ['Kanban Board', 'Drag tickets between columns to update status'],
-                legend: ['Color Legend', 'Status and priority color explanations'],
+                legend: ['Color Legend', 'Status, priority, board, labels and category references'],
                 team: ['Team Workload', 'Staff assignment distribution'],
                 users: ['User Management', 'Create and manage user accounts'],
                 settings: ['Settings', 'Account preferences and system configuration']
@@ -1152,7 +1366,42 @@
 
             if (name === 'users') loadUsers();
             if (name === 'board') loadKanbanBoard();
+            if (name === 'legend') loadLegendData();
             if (name === 'settings') { loadCategoryList(); loadLabelList(); }
+        }
+
+        async function loadLegendData() {
+            try {
+                const [labelsRes, catsRes] = await Promise.all([
+                    fetch('/api/labels'), fetch('/api/categories')
+                ]);
+                const labels = await labelsRes.json();
+                const categories = await catsRes.json();
+                const lc = document.getElementById('legend-labels-container');
+                if (labels.length === 0) {
+                    lc.innerHTML = '<div class="text-neutral-500 text-sm">No labels configured</div>';
+                } else {
+                    lc.innerHTML = labels.map(l =>
+                        `<div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
+                            <span class="w-4 h-4 rounded" style="background:${l.color}"></span>
+                            <span class="font-medium text-white text-sm">${l.name}</span>
+                            <span class="ml-auto px-2 py-0.5 rounded text-xs font-medium" style="background:${l.color}22;color:${l.color}">${l.name}</span>
+                        </div>`
+                    ).join('');
+                }
+                const cc = document.getElementById('legend-categories-container');
+                if (categories.length === 0) {
+                    cc.innerHTML = '<div class="text-neutral-500 text-sm">No categories configured</div>';
+                } else {
+                    cc.innerHTML = categories.map(c =>
+                        `<div class="flex items-center gap-3 p-2.5 bg-neutral-900/50 rounded-lg">
+                            <span class="w-3.5 h-3.5 rounded" style="background:${c.color}"></span>
+                            <i class="fas ${c.icon || 'fa-tag'} text-xs" style="color:${c.color}"></i>
+                            <span class="font-medium text-white text-sm">${c.name}</span>
+                        </div>`
+                    ).join('');
+                }
+            } catch (e) { console.error('Error loading legend data:', e); }
         }
 
         // --- KANBAN BOARD ---
