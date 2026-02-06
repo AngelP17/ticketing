@@ -1120,10 +1120,10 @@
                                 usePointStyle: true, pointStyle: 'rectRounded', pointStyleWidth: 10, padding: 14,
                                 generateLabels: function(chart) {
                                     const ds = chart.data.datasets[0];
-                                    const total = ds.data.reduce((a, b) => a + b, 0);
                                     return chart.data.labels.map((label, i) => ({
                                         text: `${label}  ${ds.data[i]}`,
                                         fillStyle: ds.backgroundColor[i],
+                                        fontColor: '#e5e5e5',
                                         strokeStyle: 'transparent',
                                         hidden: false, index: i
                                     }));
