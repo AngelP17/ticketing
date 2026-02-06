@@ -1078,15 +1078,25 @@
             callbacks: { label: function(ctx) { const total = ctx.dataset.data.reduce((a, b) => a + b, 0); const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0; return ` ${ctx.label}: ${ctx.raw} (${pct}%)`; } }
         };
 
+        // Fixed color maps so each value always gets the same distinct color
+        const statusColorMap = {
+            'Open': '#ef4444', 'In Progress': '#3b82f6', 'Waiting for Info': '#f59e0b',
+            'Resolved': '#8b5cf6', 'Closed': '#22c55e'
+        };
+        const priorityColorMap = {
+            'Critical': '#ef4444', 'High': '#f97316', 'Medium': '#facc15',
+            'Low': '#22c55e', 'None': '#a3a3a3'
+        };
+
         function renderCharts(s) {
             const total = Object.values(s.statuses).reduce((a, b) => a + b, 0);
             const critCount = s.priorities['Critical'] || 0;
-            createDoughnutChart('statusChart', s.statuses,
-                ['#34d399', '#2dd4bf', '#60a5fa', '#fbbf24', '#f87171'],
+            const statusColors = Object.keys(s.statuses).map(k => statusColorMap[k] || '#6b7280');
+            createDoughnutChart('statusChart', s.statuses, statusColors,
                 { text: String(total), subtext: 'TOTAL', color: '#ffffff' });
-            createDoughnutChart('priorityChart', s.priorities,
-                ['#f87171', '#fb923c', '#facc15', '#4ade80', '#a3a3a3'],
-                { text: String(critCount), subtext: 'CRITICAL', color: critCount > 0 ? '#f87171' : '#ffffff' });
+            const priorityColors = Object.keys(s.priorities).map(k => priorityColorMap[k] || '#6b7280');
+            createDoughnutChart('priorityChart', s.priorities, priorityColors,
+                { text: String(critCount), subtext: 'CRITICAL', color: critCount > 0 ? '#ef4444' : '#ffffff' });
             createHorizontalBarChart('requestTypeChart', s.request_types);
             createWorkloadChart('workloadChart', s.staff_workload);
         }
