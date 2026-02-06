@@ -606,10 +606,10 @@
                         </div>
                     </div>
                     <!-- Categories Legend (dynamically loaded) -->
-                    <div class="card rounded-xl p-6">
+                    <div class="card rounded-xl p-6 lg:col-span-2">
                         <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2"><i
                                 class="fas fa-folder-open text-teal-400"></i> Request Categories</h3>
-                        <div id="legend-categories-container" class="max-h-80 overflow-y-auto space-y-2 pr-1">
+                        <div id="legend-categories-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                             <div class="text-neutral-500 text-sm">Loading categories...</div>
                         </div>
                     </div>
@@ -1043,20 +1043,25 @@
         const centerTextPlugin = {
             id: 'centerText',
             afterDraw(chart) {
-                if (chart.config.type !== 'doughnut' || !chart.options.plugins.centerText) return;
-                const { ctx, chartArea: { left, right, top, bottom } } = chart;
-                const centerX = (left + right) / 2;
-                const centerY = (top + bottom) / 2;
-                const cfg = chart.options.plugins.centerText;
+                if (chart.config.type !== 'doughnut') return;
+                const cfg = chart.options.plugins && chart.options.plugins.centerText;
+                if (!cfg) return;
+                const { ctx } = chart;
+                const { left, right, top, bottom } = chart.chartArea;
+                const cx = (left + right) / 2;
+                const cy = (top + bottom) / 2;
                 ctx.save();
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.font = `700 ${cfg.fontSize || 28}px Inter, system-ui, sans-serif`;
-                ctx.fillStyle = cfg.color || '#ffffff';
-                ctx.fillText(cfg.text || '', centerX, centerY - 8);
-                ctx.font = `400 10px Inter, system-ui, sans-serif`;
-                ctx.fillStyle = '#737373';
-                ctx.fillText(cfg.subtext || '', centerX, centerY + 14);
+                // Main number
+                const fontSize = cfg.fontSize || 26;
+                ctx.font = 'bold ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+                ctx.fillStyle = cfg.color || '#f5f5f5';
+                ctx.fillText(String(cfg.text || ''), cx, cy - 7);
+                // Subtext label
+                ctx.font = '500 9px -apple-system, BlinkMacSystemFont, sans-serif';
+                ctx.fillStyle = '#a3a3a3';
+                ctx.fillText(String(cfg.subtext || ''), cx, cy + 12);
                 ctx.restore();
             }
         };
@@ -1077,7 +1082,7 @@
             const critCount = s.priorities['Critical'] || 0;
             createDoughnutChart('statusChart', s.statuses,
                 ['#34d399', '#2dd4bf', '#60a5fa', '#fbbf24', '#f87171'],
-                { text: String(total), subtext: 'TOTAL' });
+                { text: String(total), subtext: 'TOTAL', color: '#ffffff' });
             createDoughnutChart('priorityChart', s.priorities,
                 ['#f87171', '#fb923c', '#facc15', '#4ade80', '#a3a3a3'],
                 { text: String(critCount), subtext: 'CRITICAL', color: critCount > 0 ? '#f87171' : '#ffffff' });
@@ -1381,25 +1386,27 @@
                 if (labels.length === 0) {
                     lc.innerHTML = '<div class="text-neutral-500 text-sm">No labels configured</div>';
                 } else {
-                    lc.innerHTML = labels.map(l =>
-                        `<div class="flex items-center gap-4 p-3 bg-neutral-900/50 rounded-lg">
-                            <span class="w-4 h-4 rounded" style="background:${l.color}"></span>
-                            <span class="font-medium text-white text-sm">${l.name}</span>
-                            <span class="ml-auto px-2 py-0.5 rounded text-xs font-medium" style="background:${l.color}22;color:${l.color}">${l.name}</span>
-                        </div>`
-                    ).join('');
+                    lc.innerHTML = labels.map(l => {
+                        const c = l.color || '#3b82f6';
+                        return `<div class="flex items-center gap-3 p-3 bg-neutral-900/50 rounded-lg">
+                            <span class="w-4 h-4 rounded flex-shrink-0" style="background-color:${c}"></span>
+                            <span class="font-medium text-white text-sm flex-1">${l.name}</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0" style="background-color:${c}20;color:${c}">${l.name}</span>
+                        </div>`;
+                    }).join('');
                 }
                 const cc = document.getElementById('legend-categories-container');
                 if (categories.length === 0) {
                     cc.innerHTML = '<div class="text-neutral-500 text-sm">No categories configured</div>';
                 } else {
-                    cc.innerHTML = categories.map(c =>
-                        `<div class="flex items-center gap-3 p-2.5 bg-neutral-900/50 rounded-lg">
-                            <span class="w-3.5 h-3.5 rounded" style="background:${c.color}"></span>
-                            <i class="fas ${c.icon || 'fa-tag'} text-xs" style="color:${c.color}"></i>
-                            <span class="font-medium text-white text-sm">${c.name}</span>
-                        </div>`
-                    ).join('');
+                    cc.innerHTML = categories.map(c => {
+                        const clr = c.color || '#6366f1';
+                        return `<div class="flex items-center gap-3 p-2.5 bg-neutral-900/50 rounded-lg">
+                            <span class="w-3 h-3 rounded flex-shrink-0" style="background-color:${clr}"></span>
+                            <i class="fas ${c.icon || 'fa-tag'} text-xs flex-shrink-0" style="color:${clr}"></i>
+                            <span class="font-medium text-white text-sm truncate">${c.name}</span>
+                        </div>`;
+                    }).join('');
                 }
             } catch (e) { console.error('Error loading legend data:', e); }
         }
