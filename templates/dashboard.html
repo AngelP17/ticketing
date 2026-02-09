@@ -328,21 +328,27 @@
 
                 <!-- Charts Row 1 -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Ticket Status Chart -->
                     <div class="card rounded-xl p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-sm font-semibold text-white tracking-wide">Ticket Status</h3>
                             <span class="text-xs text-neutral-500">Distribution</span>
                         </div>
-                        <div class="h-56"><canvas id="statusChart"></canvas></div>
-                        <div id="statusChart-legend" class="flex flex-wrap justify-center gap-3 mt-4"></div>
+                        <div class="flex items-center gap-6">
+                            <div class="w-48 h-48 flex-shrink-0"><canvas id="statusChart"></canvas></div>
+                            <div id="statusChart-legend" class="flex flex-col gap-2 flex-1"></div>
+                        </div>
                     </div>
+                    <!-- Priority Levels Chart -->
                     <div class="card rounded-xl p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-sm font-semibold text-white tracking-wide">Priority Levels</h3>
                             <span class="text-xs text-neutral-500">Breakdown</span>
                         </div>
-                        <div class="h-56"><canvas id="priorityChart"></canvas></div>
-                        <div id="priorityChart-legend" class="flex flex-wrap justify-center gap-3 mt-4"></div>
+                        <div class="flex items-center gap-6">
+                            <div class="w-48 h-48 flex-shrink-0"><canvas id="priorityChart"></canvas></div>
+                            <div id="priorityChart-legend" class="flex flex-col gap-2 flex-1"></div>
+                        </div>
                     </div>
                 </div>
                 <!-- Charts Row 2 -->
@@ -1168,17 +1174,17 @@
                 }
             });
 
-            // Generate custom HTML legend with white text
+            // Generate custom HTML legend with white text (using inline styles)
             const legendContainer = document.getElementById(id + '-legend');
             if (legendContainer) {
                 const total = values.reduce((a, b) => a + b, 0);
                 legendContainer.innerHTML = labels.map((label, i) => {
                     const count = values[i];
                     const pct = total ? ((count / total) * 100).toFixed(0) : 0;
-                    return `<div class="flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color:${colors[i]}"></span>
-                        <span class="text-white text-xs">${label}</span>
-                        <span class="text-neutral-400 text-xs">${count}</span>
+                    return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+                        <span style="width:12px;height:12px;border-radius:50%;background-color:${colors[i]};flex-shrink:0;"></span>
+                        <span style="color:#ffffff;font-size:13px;font-weight:500;">${label}</span>
+                        <span style="color:#a3a3a3;font-size:12px;">${count}</span>
                     </div>`;
                 }).join('');
             }
