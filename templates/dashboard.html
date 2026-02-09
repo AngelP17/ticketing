@@ -1127,7 +1127,8 @@
                         legend: {
                             position: 'right',
                             labels: {
-                                color: '#ffffff', font: { size: 11, family: 'Inter, system-ui, sans-serif' },
+                                color: function() { return '#ffffff'; },
+                                font: { size: 11, family: 'Inter, system-ui, sans-serif' },
                                 usePointStyle: true, pointStyle: 'rectRounded', pointStyleWidth: 10, padding: 14,
                                 generateLabels: function(chart) {
                                     const ds = chart.data.datasets[0];
@@ -1135,8 +1136,6 @@
                                         text: `${label}  ${ds.data[i]}`,
                                         fillStyle: ds.backgroundColor[i],
                                         strokeStyle: 'transparent',
-                                        fontColor: '#ffffff',
-                                        color: '#ffffff',
                                         hidden: false, index: i
                                     }));
                                 }
