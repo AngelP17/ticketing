@@ -967,6 +967,7 @@
     </div>
 
     <script>
+        // Cache buster: v2
         let allTickets = [];
         let statsData = {};
         let countdown = 30;
@@ -1141,6 +1142,7 @@
             
             // Create custom HTML legend
             const legendContainer = document.getElementById(id + '-legend');
+            console.log('Creating legend for', id, 'container:', legendContainer);
             if (legendContainer) {
                 legendContainer.innerHTML = labels.map((label, i) => `
                     <div class="flex items-center gap-2 text-sm" style="color: #ffffff !important;">
@@ -1149,6 +1151,9 @@
                         <span style="color: #a3a3a3 !important;">${values[i]}</span>
                     </div>
                 `).join('');
+                console.log('Legend created for', id);
+            } else {
+                console.error('Legend container not found for', id);
             }
         }
 
