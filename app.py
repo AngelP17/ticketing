@@ -14,6 +14,7 @@ from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ticketing-dashboard-secret-key-2025')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Database URL from environment (Render provides this)
 DATABASE_URL = os.environ.get('DATABASE_URL')
